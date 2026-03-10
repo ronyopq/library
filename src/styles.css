@@ -1,0 +1,45 @@
+@import url("https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: "Hind Siliguri", sans-serif;
+  color: #11281c;
+  background: #f7fbf8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-image:
+    radial-gradient(circle at 10% 10%, rgba(128, 193, 153, 0.18), transparent 45%),
+    radial-gradient(circle at 92% 4%, rgba(76, 166, 115, 0.15), transparent 38%),
+    linear-gradient(180deg, #f4faf6 0%, #f8fcfa 35%, #ffffff 100%);
+}
+
+@media print {
+  .print\:hidden {
+    display: none !important;
+  }
+
+  .label-grid {
+    page-break-inside: avoid;
+    gap: 2mm !important;
+  }
+
+  .label-item {
+    border: 1px solid #000 !important;
+    box-shadow: none !important;
+  }
+
+  body {
+    background: #fff !important;
+    margin: 0;
+  }
+}
