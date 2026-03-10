@@ -88,18 +88,18 @@ export const LoansPage = () => {
 
   return (
     <div className="space-y-4">
-      <header className="rounded-2xl border border-brand-200 bg-white p-4 shadow-soft">
-        <h2 className="font-heading text-xl">Lending / Borrowed for Reading</h2>
-        <p className="text-sm text-ink-500">??? ???? ? ???? ?????????</p>
+      <header className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
+        <h2 className="font-heading text-xl">Loan Management</h2>
+        <p className="text-sm text-app-muted">Track borrowed books and return dates.</p>
       </header>
 
-      <section className="rounded-2xl border border-brand-200 bg-white p-4 shadow-soft">
+      <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
         <h3 className="font-heading text-base">Create Loan</h3>
         <div className="mt-3 grid gap-3 md:grid-cols-2">
           <select
             value={form.bookId}
             onChange={(event) => setForm((prev) => ({ ...prev, bookId: event.target.value }))}
-            className="rounded-xl border border-brand-200 px-3 py-2 text-sm"
+            className="rounded-xl border border-app-border px-3 py-2 text-sm"
           >
             <option value="">Select book</option>
             {books
@@ -114,63 +114,63 @@ export const LoansPage = () => {
             value={form.borrowerName}
             onChange={(event) => setForm((prev) => ({ ...prev, borrowerName: event.target.value }))}
             placeholder="Borrower name"
-            className="rounded-xl border border-brand-200 px-3 py-2 text-sm"
+            className="rounded-xl border border-app-border px-3 py-2 text-sm"
           />
           <input
             value={form.borrowerPhone}
             onChange={(event) => setForm((prev) => ({ ...prev, borrowerPhone: event.target.value }))}
             placeholder="Phone"
-            className="rounded-xl border border-brand-200 px-3 py-2 text-sm"
+            className="rounded-xl border border-app-border px-3 py-2 text-sm"
           />
           <input
             value={form.borrowerEmail}
             onChange={(event) => setForm((prev) => ({ ...prev, borrowerEmail: event.target.value }))}
             placeholder="Email"
-            className="rounded-xl border border-brand-200 px-3 py-2 text-sm"
+            className="rounded-xl border border-app-border px-3 py-2 text-sm"
           />
           <input
             type="date"
             value={form.expectedReturnAt}
             onChange={(event) => setForm((prev) => ({ ...prev, expectedReturnAt: event.target.value }))}
-            className="rounded-xl border border-brand-200 px-3 py-2 text-sm"
+            className="rounded-xl border border-app-border px-3 py-2 text-sm"
           />
           <input
             value={form.note}
             onChange={(event) => setForm((prev) => ({ ...prev, note: event.target.value }))}
             placeholder="Note"
-            className="rounded-xl border border-brand-200 px-3 py-2 text-sm"
+            className="rounded-xl border border-app-border px-3 py-2 text-sm"
           />
         </div>
         <div className="mt-3 flex items-center justify-between">
-          <label className="inline-flex items-center gap-2 text-sm text-ink-600">
+          <label className="inline-flex items-center gap-2 text-sm text-app-muted">
             <input
               type="checkbox"
               checked={form.allowOverride}
               onChange={(event) => setForm((prev) => ({ ...prev, allowOverride: event.target.checked }))}
             />
-            Allow double-lending intentionally
+            Allow intentional double-lending
           </label>
 
           <button
             type="button"
             onClick={() => createLoanMutation.mutate()}
             disabled={!form.bookId || !form.borrowerName || createLoanMutation.isPending}
-            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+            className="rounded-lg bg-app-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
           >
             {createLoanMutation.isPending ? "Saving..." : "Create Loan"}
           </button>
         </div>
       </section>
 
-      <section className="rounded-2xl border border-brand-200 bg-white p-4 shadow-soft">
+      <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
         <h3 className="font-heading text-base">Loan History</h3>
         {loans.length === 0 ? (
-          <EmptyState title="No loans yet" description="??? ???? ???? ???? ????? ???? ????" />
+          <EmptyState title="No loans yet" description="Created loans will appear here." />
         ) : (
           <div className="mt-3 overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="text-left text-ink-500">
+                <tr className="text-left text-app-muted">
                   <th className="p-2">Book</th>
                   <th className="p-2">Borrower</th>
                   <th className="p-2">Borrowed</th>
@@ -181,10 +181,10 @@ export const LoansPage = () => {
               </thead>
               <tbody>
                 {loans.map((loan) => (
-                  <tr key={loan.id} className="border-t border-brand-100">
+                  <tr key={loan.id} className="border-t border-app-border">
                     <td className="p-2">
                       <p className="font-medium">{loan.bookTitle || "Unknown"}</p>
-                      <p className="text-xs text-ink-500">{loan.accessionCode || "-"}</p>
+                      <p className="text-xs text-app-muted">{loan.accessionCode || "-"}</p>
                     </td>
                     <td className="p-2">{loan.borrowerName}</td>
                     <td className="p-2">{formatDate(loan.borrowedAt)}</td>
@@ -207,7 +207,7 @@ export const LoansPage = () => {
                         <button
                           type="button"
                           onClick={() => returnMutation.mutate(loan.id)}
-                          className="rounded-lg border border-brand-200 px-3 py-1 text-xs"
+                          className="rounded-lg border border-app-border px-3 py-1 text-xs"
                         >
                           Mark Returned
                         </button>

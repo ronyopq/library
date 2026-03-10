@@ -11,7 +11,7 @@ const parseYear = (value?: string): number | undefined => {
 
 const detectLanguage = (key?: string): string | undefined => {
   if (!key) return undefined;
-  if (key.includes("ben")) return "?????";
+  if (key.includes("ben")) return "Bangla";
   if (key.includes("eng")) return "English";
   return undefined;
 };

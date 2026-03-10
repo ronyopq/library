@@ -1,13 +1,13 @@
-@import url("https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  font-family: "Hind Siliguri", sans-serif;
-  color: #11281c;
-  background: #f7fbf8;
+  font-family: "Sora", sans-serif;
+  color: #1b2440;
+  background: #f5f7fb;
 }
 
 * {
@@ -18,9 +18,9 @@ body {
   margin: 0;
   min-height: 100vh;
   background-image:
-    radial-gradient(circle at 10% 10%, rgba(128, 193, 153, 0.18), transparent 45%),
-    radial-gradient(circle at 92% 4%, rgba(76, 166, 115, 0.15), transparent 38%),
-    linear-gradient(180deg, #f4faf6 0%, #f8fcfa 35%, #ffffff 100%);
+    radial-gradient(circle at 14% -10%, rgba(94, 139, 255, 0.28), transparent 36%),
+    radial-gradient(circle at 90% 12%, rgba(53, 160, 255, 0.18), transparent 40%),
+    linear-gradient(180deg, #eff3fb 0%, #f5f7fb 42%, #ffffff 100%);
 }
 
 @media print {

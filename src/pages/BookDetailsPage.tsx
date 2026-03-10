@@ -24,7 +24,7 @@ export const BookDetailsPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["books"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      navigate("/library");
+      navigate("/admin/library");
     }
   });
 
@@ -44,15 +44,17 @@ export const BookDetailsPage = () => {
 
   return (
     <div className="space-y-4">
-      <header className="rounded-2xl border border-brand-200 bg-white p-4 shadow-soft">
+      <header className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="font-heading text-2xl text-ink-900">{book.title || "Untitled"}</h2>
-            <p className="text-sm text-ink-500">{book.contributors?.filter((item: any) => item.role === "author").map((item: any) => item.name).join(", ") || "No author"}</p>
-            <p className="mt-1 text-xs text-ink-400">{book.accessionCode} • {book.publicCode}</p>
+            <h2 className="font-heading text-2xl text-app-text">{book.title || "Untitled"}</h2>
+            <p className="text-sm text-app-muted">
+              {book.contributors?.filter((item: any) => item.role === "author").map((item: any) => item.name).join(", ") || "No author"}
+            </p>
+            <p className="mt-1 text-xs text-app-muted">{book.accessionCode} - {book.publicCode}</p>
           </div>
           <div className="flex gap-2">
-            <Link to={`/books/${bookId}/edit`} className="rounded-lg border border-brand-200 px-3 py-2 text-sm">
+            <Link to={`/admin/books/${bookId}/edit`} className="rounded-lg border border-app-border px-3 py-2 text-sm">
               Edit
             </Link>
             {!book.isArchived ? (
@@ -77,7 +79,7 @@ export const BookDetailsPage = () => {
       </header>
 
       <section className="grid gap-4 lg:grid-cols-[220px_1fr]">
-        <aside className="rounded-2xl border border-brand-200 bg-white p-4 shadow-soft">
+        <aside className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
           {book.coverImageKey ? (
             <img
               src={`/i/${encodeURIComponent(book.coverImageKey)}`}
@@ -85,9 +87,9 @@ export const BookDetailsPage = () => {
               className="h-72 w-full rounded-lg object-cover"
             />
           ) : (
-            <div className="flex h-72 items-center justify-center rounded-lg bg-brand-50 text-sm text-ink-500">No Cover</div>
+            <div className="flex h-72 items-center justify-center rounded-lg bg-app-surface text-sm text-app-muted">No Cover</div>
           )}
-          <div className="mt-4 rounded-xl border border-brand-100 p-2">
+          <div className="mt-4 rounded-xl border border-app-border p-2">
             <Barcode value={book.accessionCode} height={46} width={1.1} displayValue={false} background="transparent" margin={0} />
             <p className="mt-1 text-center text-xs">{book.accessionCode}</p>
           </div>
@@ -96,7 +98,7 @@ export const BookDetailsPage = () => {
           </div>
         </aside>
 
-        <article className="space-y-4 rounded-2xl border border-brand-200 bg-white p-4 shadow-soft">
+        <article className="space-y-4 rounded-2xl border border-app-border bg-white p-4 shadow-card">
           <div className="grid gap-3 md:grid-cols-2">
             <p><strong>Category:</strong> {book.categoryName || "-"}</p>
             <p><strong>Language:</strong> {book.languageName || "-"}</p>
@@ -112,17 +114,17 @@ export const BookDetailsPage = () => {
 
           <div>
             <h3 className="font-heading text-base">Summary</h3>
-            <p className="mt-1 whitespace-pre-wrap text-sm text-ink-700">{book.summary || "-"}</p>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-app-muted">{book.summary || "-"}</p>
           </div>
 
           <div>
             <h3 className="font-heading text-base">Public Notes</h3>
-            <p className="mt-1 whitespace-pre-wrap text-sm text-ink-700">{book.publicNotes || "-"}</p>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-app-muted">{book.publicNotes || "-"}</p>
           </div>
 
           <div>
             <h3 className="font-heading text-base">Private Notes</h3>
-            <p className="mt-1 whitespace-pre-wrap text-sm text-ink-700">{book.personalNotes || "-"}</p>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-app-muted">{book.personalNotes || "-"}</p>
           </div>
         </article>
       </section>

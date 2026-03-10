@@ -1,6 +1,6 @@
-# Personal Library Management (Cloudflare)
+ï»¿# Personal Library Management (Cloudflare)
 
-Production-ready MVP for a Bengali-friendly personal home-library system.
+Production-ready MVP for a personal home-library system with clean admin/public separation.
 
 - Frontend: React + Vite + Tailwind + TanStack Query + Zod
 - Backend: Cloudflare Workers + Hono + TypeScript
@@ -8,26 +8,32 @@ Production-ready MVP for a Bengali-friendly personal home-library system.
 - Cache / lightweight storage: Cloudflare KV
 - ORM/query layer: Drizzle ORM
 
+## Product Model
+
+- Public side (read-only): browse and search public books by title/author/code/shelf location
+- Admin side (authenticated by token): add/edit/archive/restore/delete books, manage loans, settings, labels, activity
+- Short public book links: `/b/r123`
+
 ## MVP Features Included
 
-- Book add/edit with three paths:
+- Book add/edit workflows:
   - Manual form
   - ISBN metadata autofill (Open Library + Google Books, merged + cached)
-  - OCR-assisted fallback interface (OCR.Space provider if API key is present, graceful fallback if not)
-- Cover upload with manual crop (mobile-friendly) and optimized upload flow
+  - OCR-assisted fallback interface (OCR.Space provider if API key exists, manual fallback otherwise)
+- Cover upload with manual crop (mobile-friendly)
 - Rich metadata model (contributors, acquisition info, location hierarchy, tags, notes, visibility)
-- Unique ID strategy:
-  - Internal `id`
+- Unique IDs:
+  - Internal numeric ID
   - Accession code (`LIB-YYYY-000001`)
-  - Public short code (`r123`) used in `/b/:shortId`
+  - Public short code (`r123`)
 - Duplicate warning (ISBN + similar title/author) with explicit force-save option
 - Dashboard analytics (books/authors/categories/languages/borrowed/overdue/archived + distributions)
 - Library cards with search/filter/sort
 - Lending/borrowing workflow with overdue tracking
 - Barcode + QR generation
-- Label/Barcode print page with configurable fields
+- Label print page with configurable fields
 - Public safe book page (`/b/:shortId`) with privacy-safe field boundary
-- Soft delete/archive + restore
+- Soft delete (archive) + restore + protected permanent delete
 - Activity log
 - CSV export (books + loans)
 - Mobile form draft auto-save in local storage
@@ -36,26 +42,26 @@ Production-ready MVP for a Bengali-friendly personal home-library system.
 ## Why This Stack For Cloudflare
 
 - Worker + D1 + KV is native to Cloudflare and minimizes deployment friction.
-- Vite static build + Worker assets binding is straightforward and low-maintenance for solo operation.
-- Hono keeps Worker API clean and lightweight.
-- Drizzle provides strong typing while staying practical with SQLite/D1.
+- Vite static build + Worker assets binding is straightforward for solo maintenance.
+- Hono keeps Worker APIs lightweight.
+- Drizzle gives practical type safety for D1/SQLite.
 
 ## Architecture Overview
 
 - `worker/index.ts`
-  - Serves API routes under `/api/*`
-  - Serves public page at `/b/:shortId`
+  - Serves API under `/api/*`
+  - Serves public short page at `/b/:shortId`
   - Serves cover images at `/i/:key`
-  - Falls back to Vite `index.html` for SPA routes
+  - Falls back to Vite `index.html` for SPA routes (`/`, `/admin/*`)
 - `worker/services/*`
-  - Domain services for books, loans, dashboard, settings, exports
+  - Domain services (books, loans, dashboard, settings, exports)
   - ISBN and OCR provider abstractions
 - `worker/db/*`
   - Drizzle schema + db client
 - `drizzle/*.sql`
   - Migrations and seed SQL for D1
 - `src/*`
-  - Admin frontend (responsive, mobile-first)
+  - React frontend for public catalog + admin panel
 - `shared/*`
   - Shared types + Zod schemas
 
@@ -63,26 +69,26 @@ Production-ready MVP for a Bengali-friendly personal home-library system.
 
 ```text
 .
-+- docs/
-¦  +- setup.md
-¦  +- deployment.md
-¦  +- future-improvements.md
-+- drizzle/
-¦  +- 0000_initial.sql
-¦  +- 0001_seed.sql
-+- shared/
-+- src/
-+- worker/
-+- wrangler.toml
-+- package.json
-+- README.md
+|-- docs/
+|   |-- setup.md
+|   |-- deployment.md
+|   `-- future-improvements.md
+|-- drizzle/
+|   |-- 0000_initial.sql
+|   `-- 0001_seed.sql
+|-- shared/
+|-- src/
+|-- worker/
+|-- wrangler.toml
+|-- package.json
+`-- README.md
 ```
 
 ## Local Setup
 
-Use [docs/setup.md](./docs/setup.md) for full setup.
+Full instructions: [docs/setup.md](./docs/setup.md)
 
-Quick version:
+Quick start:
 
 1. Install dependencies:
 
@@ -90,16 +96,16 @@ Quick version:
 npm install
 ```
 
-2. Create Cloudflare resources (D1 + KV), then update `wrangler.toml` placeholders.
+2. Create Cloudflare resources (D1 + KV), then update `wrangler.toml` bindings.
 
-3. Apply database migration and seed:
+3. Apply local migration and seed:
 
 ```bash
 npm run db:migrate:local
 npm run db:seed:local
 ```
 
-4. Run development servers:
+4. Run development:
 
 ```bash
 npm run dev
@@ -108,46 +114,60 @@ npm run dev
 - Frontend: `http://localhost:5173`
 - Worker API: `http://localhost:8787`
 
-## Environment
+## Environment Variables
 
-Copy `.env.example` to `.env` (local only):
+Copy `.env.example` to `.env` for local use.
 
-- `ADMIN_TOKEN` optional admin guard for API
+- `ADMIN_TOKEN` optional admin guard for admin APIs
 - `OCR_SPACE_API_KEY` optional OCR provider key
-- `PUBLIC_BASE_URL` optional public URL default
+- `PUBLIC_BASE_URL` optional default base URL for QR/public links
+
+## Routes
+
+- Public SPA:
+  - `/` catalog
+  - `/book/:shortCode` public React detail page
+- Public short route:
+  - `/b/:shortId` lightweight public HTML page for QR links
+- Admin SPA:
+  - `/admin/login`
+  - `/admin/*`
 
 ## Core API Routes
 
-- Books
+- Public APIs (no admin token required):
+  - `GET /api/public/books`
+  - `GET /api/public/books/:shortCode`
+  - `GET /api/public/summary`
+- Admin book APIs:
   - `GET /api/books`
   - `GET /api/books/:id`
   - `POST /api/books`
   - `PUT /api/books/:id`
   - `POST /api/books/:id/archive`
   - `POST /api/books/:id/restore`
+  - `DELETE /api/books/:id` (permanent delete)
   - `POST /api/books/duplicates`
-- Metadata
+- Metadata:
   - `POST /api/isbn/lookup`
   - `POST /api/ocr/extract`
-- Images
+- Images:
   - `POST /api/images/cover`
   - `GET /i/:key`
-- Lending
+- Lending:
   - `GET /api/loans`
   - `POST /api/loans`
   - `POST /api/loans/:id/return`
-- Dashboard / activity
+- Dashboard/activity:
   - `GET /api/dashboard`
   - `GET /api/activity`
-- Settings / options
+- Settings/options:
   - `GET /api/settings`
   - `PUT /api/settings`
   - `GET /api/options`
-- Export
+- Export:
   - `GET /api/export/books.csv`
   - `GET /api/export/loans.csv`
-- Public route
-  - `GET /b/:shortId`
 
 ## Commands
 
@@ -161,9 +181,9 @@ npm run db:seed:local
 npm run deploy
 ```
 
-## Deployment (Cloudflare)
+## Deployment
 
-Use [docs/deployment.md](./docs/deployment.md) for full step-by-step.
+Step-by-step: [docs/deployment.md](./docs/deployment.md)
 
 Short version:
 
@@ -175,22 +195,22 @@ wrangler deploy
 
 ## Privacy Boundary
 
-Public page exposes only safe fields (title/author/publisher/category/language/date/cover/public notes).
+Public pages expose only safe fields (title/subtitle/author/publisher/category/language/date/cover/public notes/location).
 
-Private fields stay internal:
+Private fields remain admin-only:
 
 - purchase price
 - personal notes
 - loan history
-- acquisition private/gift notes (unless copied into public fields)
-- internal-only metadata
+- private acquisition/gift notes
+- internal metadata details
 
-## Backup / Restore Guidance
+## Backup Guidance
 
 - Export books CSV: `/api/export/books.csv`
 - Export loans CSV: `/api/export/loans.csv`
-- D1 full backup recommended via `wrangler d1 export` periodically
-- Keep `.sql` migrations in Git for reproducibility
+- Periodic D1 backup via `wrangler d1 export`
+- Keep migrations in Git
 
 ## GitHub Push Steps
 
@@ -205,9 +225,9 @@ git push -u origin main
 
 ## Known MVP Notes
 
-- OCR is integration-ready; best results require an OCR provider key.
-- Cover crop is user-assisted (clean upgrade path for AI auto-crop).
-- CSV import is intentionally left for next phase; service boundaries are ready for it.
+- OCR integration is provider-ready; quality depends on provider/API key.
+- Cover crop is manual-assisted (upgrade-ready for AI auto-crop).
+- CSV import intentionally left for next phase; architecture is import-ready.
 
 ## Future Roadmap
 

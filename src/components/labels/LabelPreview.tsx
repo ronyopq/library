@@ -25,11 +25,11 @@ export const LabelPreview = ({
   const qrValue = `${qrBase.replace(/\/$/, "")}/b/${book.publicCode}`;
 
   return (
-    <article className="label-item rounded-lg border border-brand-200 bg-white p-2 text-[10px] text-ink-900">
+    <article className="label-item rounded-lg border border-app-border bg-white p-2 text-[10px] text-app-text">
       <p className="font-semibold text-[10px]">{libraryName}</p>
       {includeTitle ? <p className="line-clamp-2 font-medium">{book.title || "Untitled"}</p> : null}
-      {includeAuthor ? <p className="line-clamp-1 text-[9px] text-ink-600">{book.authors.join(", ")}</p> : null}
-      {includeDate ? <p className="text-[9px] text-ink-500">{new Date(book.dateAdded).toLocaleDateString()}</p> : null}
+      {includeAuthor ? <p className="line-clamp-1 text-[9px] text-app-muted">{book.authors.join(", ")}</p> : null}
+      {includeDate ? <p className="text-[9px] text-app-muted">{new Date(book.dateAdded).toLocaleDateString()}</p> : null}
 
       <div className="mt-1 flex items-end justify-between gap-1">
         <Barcode
@@ -39,7 +39,7 @@ export const LabelPreview = ({
           displayValue={false}
           margin={0}
           background="transparent"
-          lineColor="#173224"
+          lineColor="#1f3f88"
         />
         {includeQr ? <QRCodeSVG value={qrValue} size={34} includeMargin={false} /> : null}
       </div>

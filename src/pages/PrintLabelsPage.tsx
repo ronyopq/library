@@ -68,35 +68,27 @@ export const PrintLabelsPage = () => {
 
   return (
     <div className="space-y-4">
-      <header className="rounded-2xl border border-brand-200 bg-white p-4 shadow-soft">
-        <h2 className="font-heading text-xl">Print Barcodes / Labels</h2>
-        <p className="text-sm text-ink-500">????????? ????? ???? ???????????? ?????</p>
+      <header className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
+        <h2 className="font-heading text-xl">Print Barcodes and Labels</h2>
+        <p className="text-sm text-app-muted">Generate printable label sheets for selected books.</p>
       </header>
 
-      <section className="rounded-2xl border border-brand-200 bg-white p-4 shadow-soft">
+      <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
         <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search title/accession/author"
-            className="rounded-xl border border-brand-200 px-3 py-2 text-sm"
+            placeholder="Search title, accession, author"
+            className="rounded-xl border border-app-border px-3 py-2 text-sm"
           />
-          <button type="button" onClick={() => window.print()} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white">
+          <button type="button" onClick={() => window.print()} className="rounded-lg bg-app-primary px-4 py-2 text-sm font-medium text-white">
             Print ({selectedBooks.length})
           </button>
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => downloadFile("/api/export/books.csv")}
-              className="rounded-lg border border-brand-200 px-3 py-2 text-sm"
-            >
+            <button type="button" onClick={() => downloadFile("/api/export/books.csv")} className="rounded-lg border border-app-border px-3 py-2 text-sm">
               Export Books CSV
             </button>
-            <button
-              type="button"
-              onClick={() => downloadFile("/api/export/loans.csv")}
-              className="rounded-lg border border-brand-200 px-3 py-2 text-sm"
-            >
+            <button type="button" onClick={() => downloadFile("/api/export/loans.csv")} className="rounded-lg border border-app-border px-3 py-2 text-sm">
               Export Loans CSV
             </button>
           </div>
@@ -137,26 +129,26 @@ export const PrintLabelsPage = () => {
                   labelColumns: Number(event.target.value)
                 }))
               }
-              className="w-14 rounded border border-brand-200 px-2 py-1"
+              className="w-14 rounded border border-app-border px-2 py-1"
             />
           </label>
         </div>
       </section>
 
-      <section className="rounded-2xl border border-brand-200 bg-white p-4 shadow-soft print:hidden">
+      <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card print:hidden">
         <h3 className="font-heading text-base">Select Books</h3>
         {filtered.length === 0 ? (
           <EmptyState title="No books" />
         ) : (
           <ul className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
             {filtered.map((book) => (
-              <li key={book.id} className="rounded-lg border border-brand-100 p-2 text-sm">
+              <li key={book.id} className="rounded-lg border border-app-border p-2 text-sm">
                 <label className="flex cursor-pointer items-start gap-2">
                   <input type="checkbox" checked={selectedIds.includes(book.id)} onChange={() => toggle(book.id)} className="mt-1" />
                   <span>
                     <strong>{book.title || "Untitled"}</strong>
                     <br />
-                    <span className="text-xs text-ink-500">{book.accessionCode} • {book.authors?.join(", ")}</span>
+                    <span className="text-xs text-app-muted">{book.accessionCode} - {book.authors?.join(", ")}</span>
                   </span>
                 </label>
               </li>

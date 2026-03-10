@@ -48,12 +48,13 @@ app.get("/b/:shortId", async (c) => {
   const category = escapeHtml(book.categoryName ?? "");
   const language = escapeHtml(book.languageName ?? "");
   const publisher = escapeHtml(book.publisherName ?? "");
-  const dateAdded = new Date(book.dateAdded).toLocaleDateString("bn-BD");
+  const dateAdded = new Date(book.dateAdded).toLocaleDateString("en-US");
+  const location = escapeHtml([book.room, book.cabinet, book.rack, book.shelf, book.positionNote].filter(Boolean).join(" / "));
   const notes = escapeHtml(book.publicNotes ?? book.summary ?? "");
   const coverUrl = book.coverImageKey ? `/i/${encodeURIComponent(book.coverImageKey)}` : "";
 
   const html = `<!doctype html>
-<html lang="bn">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -61,12 +62,12 @@ app.get("/b/:shortId", async (c) => {
   <style>
     :root {
       color-scheme: light;
-      font-family: "Hind Siliguri", sans-serif;
+      font-family: "Space Grotesk", sans-serif;
     }
     body {
       margin: 0;
-      background: radial-gradient(circle at top, #e9f7ee 0%, #f6faf7 45%, #fff 100%);
-      color: #173224;
+      background: radial-gradient(circle at top, #e8eeff 0%, #f4f7ff 45%, #fff 100%);
+      color: #1b2440;
       min-height: 100vh;
       padding: 24px;
     }
@@ -75,17 +76,17 @@ app.get("/b/:shortId", async (c) => {
       margin: 0 auto;
       background: #ffffff;
       border-radius: 18px;
-      border: 1px solid #dbeadf;
-      box-shadow: 0 18px 45px -25px rgba(12, 43, 27, 0.45);
+      border: 1px solid #d8e0f2;
+      box-shadow: 0 18px 45px -25px rgba(38, 58, 110, 0.45);
       overflow: hidden;
     }
     .header {
       padding: 20px 24px;
-      border-bottom: 1px solid #eaf2ec;
-      background: linear-gradient(120deg, #ecf8f0, #f9fdfb);
+      border-bottom: 1px solid #e5ebfa;
+      background: linear-gradient(120deg, #eef3ff, #f9fbff);
     }
     .library {
-      color: #2e6d4a;
+      color: #3b5bb0;
       font-size: 14px;
       letter-spacing: 0.03em;
       margin: 0 0 8px;
@@ -97,7 +98,7 @@ app.get("/b/:shortId", async (c) => {
     }
     .subtitle {
       margin: 8px 0 0;
-      color: #4f6f5d;
+      color: #5a678d;
       font-size: 16px;
     }
     .content {
@@ -111,26 +112,26 @@ app.get("/b/:shortId", async (c) => {
       height: 250px;
       border-radius: 12px;
       object-fit: cover;
-      background: #eff7f1;
+      background: #edf1fb;
     }
     .meta { display: grid; gap: 10px; }
-    .meta strong { color: #1f5138; }
+    .meta strong { color: #2b407f; }
     .code {
       margin-top: 12px;
       font-size: 13px;
-      color: #516a5b;
-      background: #f3f8f4;
+      color: #4f5c84;
+      background: #eef3ff;
       padding: 8px 10px;
       border-radius: 8px;
-      border: 1px dashed #c8e0d1;
+      border: 1px dashed #cad6f7;
       display: inline-block;
     }
     .notes {
       margin: 8px 24px 24px;
       padding: 14px 16px;
-      background: #f8fcf9;
+      background: #f6f8ff;
       border-radius: 10px;
-      border: 1px solid #e1efe4;
+      border: 1px solid #e2e8fb;
       white-space: pre-wrap;
     }
     @media (max-width: 680px) {
@@ -154,12 +155,13 @@ app.get("/b/:shortId", async (c) => {
     <section class="content">
       <div>${coverUrl ? `<img class="cover" src="${coverUrl}" alt="${title}" />` : `<div class="cover"></div>`}</div>
       <div class="meta">
-        ${authors ? `<div><strong>????:</strong> ${authors}</div>` : ""}
-        ${publisher ? `<div><strong>???????:</strong> ${publisher}</div>` : ""}
-        ${category ? `<div><strong>????:</strong> ${category}</div>` : ""}
-        ${language ? `<div><strong>????:</strong> ${language}</div>` : ""}
-        <div><strong>???????? ?????:</strong> ${escapeHtml(dateAdded)}</div>
-        <div class="code">???: ${escapeHtml(book.publicCode)} | Accession: ${escapeHtml(book.accessionCode)}</div>
+        ${authors ? `<div><strong>Author:</strong> ${authors}</div>` : ""}
+        ${publisher ? `<div><strong>Publisher:</strong> ${publisher}</div>` : ""}
+        ${category ? `<div><strong>Category:</strong> ${category}</div>` : ""}
+        ${language ? `<div><strong>Language:</strong> ${language}</div>` : ""}
+        ${location ? `<div><strong>Shelf:</strong> ${location}</div>` : ""}
+        <div><strong>Added On:</strong> ${escapeHtml(dateAdded)}</div>
+        <div class="code">Public Code: ${escapeHtml(book.publicCode)} | Accession: ${escapeHtml(book.accessionCode)}</div>
       </div>
     </section>
     ${notes ? `<section class="notes">${notes}</section>` : ""}

@@ -54,10 +54,7 @@ export const LibraryPage = () => {
   });
 
   const archiveMutation = useMutation({
-    mutationFn: (bookId: number) =>
-      apiRequest<{ ok: boolean }>(`/api/books/${bookId}/archive`, {
-        method: "POST"
-      }),
+    mutationFn: (bookId: number) => apiRequest<{ ok: boolean }>(`/api/books/${bookId}/archive`, { method: "POST" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["books"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
@@ -65,10 +62,7 @@ export const LibraryPage = () => {
   });
 
   const restoreMutation = useMutation({
-    mutationFn: (bookId: number) =>
-      apiRequest<{ ok: boolean }>(`/api/books/${bookId}/restore`, {
-        method: "POST"
-      }),
+    mutationFn: (bookId: number) => apiRequest<{ ok: boolean }>(`/api/books/${bookId}/restore`, { method: "POST" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["books"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
@@ -79,14 +73,14 @@ export const LibraryPage = () => {
 
   const subtitle = useMemo(() => {
     const total = booksQuery.data?.total ?? 0;
-    return `${total} ?? ?? ????? ????`;
+    return `${total} books found`;
   }, [booksQuery.data?.total]);
 
   return (
     <div className="space-y-4">
-      <header className="rounded-2xl border border-brand-200 bg-white p-4 shadow-soft">
-        <h2 className="font-heading text-xl text-ink-900">Library</h2>
-        <p className="text-sm text-ink-500">{subtitle}</p>
+      <header className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
+        <h2 className="font-heading text-xl text-app-text">Library Inventory</h2>
+        <p className="text-sm text-app-muted">{subtitle}</p>
       </header>
 
       <BookFilters filters={filters} onChange={setFilters} options={optionsQuery.data} />
@@ -95,7 +89,7 @@ export const LibraryPage = () => {
       {booksQuery.isError ? <ErrorState message={(booksQuery.error as Error).message} retry={() => booksQuery.refetch()} /> : null}
 
       {!booksQuery.isLoading && !booksQuery.isError && items.length === 0 ? (
-        <EmptyState title="???? ?? ????? ?????" description="??????? ???????? ???? ?? ???? ?? ????? ????" />
+        <EmptyState title="No books found" description="Change filters or add a new book." />
       ) : null}
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

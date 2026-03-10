@@ -6,17 +6,18 @@ interface BookCardProps {
   book: BookListItem;
   onArchive?: (book: BookListItem) => void;
   onRestore?: (book: BookListItem) => void;
+  onDelete?: (book: BookListItem) => void;
 }
 
-export const BookCard = ({ book, onArchive, onRestore }: BookCardProps) => {
+export const BookCard = ({ book, onArchive, onRestore, onDelete }: BookCardProps) => {
   return (
-    <article className="group overflow-hidden rounded-2xl border border-brand-200 bg-white shadow-soft transition hover:-translate-y-0.5 hover:border-brand-300">
+    <article className="group overflow-hidden rounded-2xl border border-app-border bg-white shadow-card transition hover:-translate-y-0.5 hover:border-app-primary">
       <div className="grid grid-cols-[96px_1fr] gap-3 p-3">
-        <div className="h-36 w-24 overflow-hidden rounded-xl bg-brand-100">
+        <div className="h-36 w-24 overflow-hidden rounded-xl bg-app-surface">
           {book.coverImageKey ? (
             <img src={`/i/${encodeURIComponent(book.coverImageKey)}`} alt={book.title ?? "Book cover"} className="h-full w-full object-cover" />
           ) : (
-            <div className="flex h-full items-center justify-center text-xs text-ink-500">No Cover</div>
+            <div className="flex h-full items-center justify-center text-xs text-app-muted">No Cover</div>
           )}
         </div>
 
@@ -33,15 +34,15 @@ export const BookCard = ({ book, onArchive, onRestore }: BookCardProps) => {
             >
               {book.status}
             </span>
-            <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] text-brand-700">{book.publicCode}</span>
+            <span className="rounded-full bg-app-surface px-2 py-0.5 text-[11px] text-app-muted">{book.publicCode}</span>
           </div>
 
-          <h3 className="line-clamp-2 font-heading text-base text-ink-900">{book.title || "??????? ???"}</h3>
-          <p className="mt-1 line-clamp-1 text-sm text-ink-600">{book.authors.join(", ") || "???? ???"}</p>
+          <h3 className="line-clamp-2 font-heading text-base text-app-text">{book.title || "Untitled"}</h3>
+          <p className="mt-1 line-clamp-1 text-sm text-app-muted">{book.authors.join(", ") || "Unknown author"}</p>
 
-          <div className="mt-3 space-y-1 text-xs text-ink-500">
-            <p>{book.category || "????????? ???"}</p>
-            <p>{book.language || "???? ???"}</p>
+          <div className="mt-3 space-y-1 text-xs text-app-muted">
+            <p>{book.category || "No category"}</p>
+            <p>{book.language || "No language"}</p>
             <p>
               {book.room || ""} {book.cabinet ? `/ ${book.cabinet}` : ""} {book.rack ? `/ ${book.rack}` : ""}{" "}
               {book.shelf ? `/ ${book.shelf}` : ""}
@@ -51,16 +52,16 @@ export const BookCard = ({ book, onArchive, onRestore }: BookCardProps) => {
         </div>
       </div>
 
-      <footer className="flex flex-wrap gap-2 border-t border-brand-100 px-3 py-3">
+      <footer className="flex flex-wrap gap-2 border-t border-app-border px-3 py-3">
         <Link
-          to={`/books/${book.id}`}
-          className="rounded-lg border border-brand-200 px-3 py-1 text-xs text-brand-700 hover:bg-brand-50"
+          to={`/admin/books/${book.id}`}
+          className="rounded-lg border border-app-border px-3 py-1 text-xs text-app-text hover:bg-app-surface"
         >
           View
         </Link>
         <Link
-          to={`/books/${book.id}/edit`}
-          className="rounded-lg border border-brand-200 px-3 py-1 text-xs text-brand-700 hover:bg-brand-50"
+          to={`/admin/books/${book.id}/edit`}
+          className="rounded-lg border border-app-border px-3 py-1 text-xs text-app-text hover:bg-app-surface"
         >
           Edit
         </Link>
@@ -73,13 +74,22 @@ export const BookCard = ({ book, onArchive, onRestore }: BookCardProps) => {
             Archive
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={() => onRestore?.(book)}
-            className="rounded-lg border border-emerald-200 px-3 py-1 text-xs text-emerald-700 hover:bg-emerald-50"
-          >
-            Restore
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => onRestore?.(book)}
+              className="rounded-lg border border-emerald-200 px-3 py-1 text-xs text-emerald-700 hover:bg-emerald-50"
+            >
+              Restore
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete?.(book)}
+              className="rounded-lg border border-rose-200 px-3 py-1 text-xs text-rose-700 hover:bg-rose-50"
+            >
+              Delete
+            </button>
+          </>
         )}
       </footer>
     </article>

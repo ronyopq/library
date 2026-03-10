@@ -189,7 +189,7 @@ CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_logs(created_at);
 
 CREATE TABLE IF NOT EXISTS library_settings (
   id INTEGER PRIMARY KEY CHECK (id = 1),
-  library_name TEXT NOT NULL DEFAULT '???? ?????????',
+  library_name TEXT NOT NULL DEFAULT 'My Library',
   logo_image_key TEXT,
   public_base_url TEXT,
   date_format TEXT NOT NULL DEFAULT 'yyyy-MM-dd',
@@ -211,7 +211,7 @@ CREATE TABLE IF NOT EXISTS library_settings (
 );
 
 INSERT OR IGNORE INTO library_settings (id, library_name, public_visibility_mode)
-VALUES (1, '???? ?????????', 'selected');
+VALUES (1, 'My Library', 'selected');
 
 CREATE TABLE IF NOT EXISTS drafts (
   id TEXT PRIMARY KEY,

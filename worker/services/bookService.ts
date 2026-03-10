@@ -255,6 +255,130 @@ export const listBooks = async (db: DbClient, filters: BookFilterInput): Promise
   };
 };
 
+export interface PublicCatalogFilters {
+  search?: string;
+  location?: string;
+  category?: string;
+  language?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export const listPublicBooks = async (
+  db: DbClient,
+  filters: PublicCatalogFilters
+): Promise<{ items: BookListItem[]; total: number }> => {
+  const whereParts: any[] = [eq(books.isArchived, false), eq(books.isPublic, true)];
+
+  if (filters.category) {
+    const key = normalizeKey(filters.category);
+    if (key) {
+      whereParts.push(
+        sql<boolean>`${books.categoryId} IN (SELECT id FROM categories WHERE name_normalized = ${key})`
+      );
+    }
+  }
+
+  if (filters.language) {
+    const key = normalizeKey(filters.language);
+    if (key) {
+      whereParts.push(
+        sql<boolean>`${books.languageId} IN (SELECT id FROM languages WHERE name_normalized = ${key})`
+      );
+    }
+  }
+
+  if (filters.location) {
+    const search = `%${filters.location.trim()}%`;
+    whereParts.push(
+      or(
+        like(books.room, search),
+        like(books.cabinet, search),
+        like(books.rack, search),
+        like(books.shelf, search),
+        like(books.positionNote, search)
+      )
+    );
+  }
+
+  if (filters.search) {
+    const normalizedSearch = normalizeTitleSearch(filters.search);
+    const plain = `%${filters.search.trim()}%`;
+    whereParts.push(
+      or(
+        normalizedSearch ? like(books.titleSearch, `%${normalizedSearch}%`) : undefined,
+        like(books.publicCode, plain),
+        sql<boolean>`${books.id} IN (
+          SELECT bp.book_id
+          FROM book_people bp
+          JOIN people pe ON pe.id = bp.person_id
+          WHERE bp.role = 'author' AND pe.name LIKE ${plain}
+        )`,
+        or(
+          like(books.room, plain),
+          like(books.cabinet, plain),
+          like(books.rack, plain),
+          like(books.shelf, plain),
+          like(books.positionNote, plain)
+        )
+      )
+    );
+  }
+
+  const whereClause = and(...whereParts);
+  const limit = filters.limit ?? 80;
+  const offset = filters.offset ?? 0;
+
+  const rows = await db
+    .select({
+      id: books.id,
+      accessionCode: books.accessionCode,
+      publicCode: books.publicCode,
+      title: books.title,
+      subtitle: books.subtitle,
+      publicationYear: books.publicationYear,
+      coverImageKey: books.coverImageKey,
+      status: books.status,
+      isArchived: books.isArchived,
+      isPublic: books.isPublic,
+      room: books.room,
+      cabinet: books.cabinet,
+      rack: books.rack,
+      shelf: books.shelf,
+      positionNote: books.positionNote,
+      dateAdded: books.dateAdded,
+      categoryName: categoryDistributionQuery,
+      languageName: languageDistributionQuery,
+      authors: authorQuery
+    })
+    .from(books)
+    .where(whereClause)
+    .orderBy(desc(books.dateAdded), desc(books.id))
+    .limit(limit)
+    .offset(offset);
+
+  const countRows = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(books)
+    .where(whereClause);
+
+  return {
+    items: rows.map(mapListRow),
+    total: Number(countRows[0]?.count ?? 0)
+  };
+};
+
+export const getPublicCatalogSummary = async (db: DbClient): Promise<{ totalPublicBooks: number }> => {
+  const rows = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(books)
+    .where(and(eq(books.isArchived, false), eq(books.isPublic, true)));
+
+  return {
+    totalPublicBooks: Number(rows[0]?.count ?? 0)
+  };
+};
+
 export const getBookById = async (db: DbClient, bookId: number) => {
   const rows = await db
     .select({
@@ -535,6 +659,37 @@ export const restoreBook = async (db: DbClient, bookId: number) => {
   });
 };
 
+export const deleteBookPermanently = async (db: DbClient, bookId: number): Promise<boolean> => {
+  const existing = await db
+    .select({
+      id: books.id,
+      isArchived: books.isArchived,
+      accessionCode: books.accessionCode
+    })
+    .from(books)
+    .where(eq(books.id, bookId))
+    .limit(1);
+
+  const target = existing[0];
+  if (!target) {
+    return false;
+  }
+
+  await db.delete(books).where(eq(books.id, bookId));
+
+  await logActivity(db, {
+    entityType: "book",
+    entityId: `${bookId}`,
+    action: "book_deleted",
+    message: `Book permanently deleted (${target.accessionCode})`,
+    payload: {
+      wasArchived: Boolean(target.isArchived)
+    }
+  });
+
+  return true;
+};
+
 export const listLibraryOptions = async (db: DbClient) => {
   const [categoryRows, languageRows, authorRows, tagRows, locationRows] = await Promise.all([
     db.select({ name: categories.name }).from(categories).orderBy(asc(categories.name)),
@@ -577,6 +732,11 @@ export const getPublicBookByCode = async (db: DbClient, shortCode: string) => {
       summary: books.summary,
       dateAdded: books.dateAdded,
       coverImageKey: books.coverImageKey,
+      room: books.room,
+      cabinet: books.cabinet,
+      rack: books.rack,
+      shelf: books.shelf,
+      positionNote: books.positionNote,
       languageName: languageDistributionQuery,
       categoryName: categoryDistributionQuery,
       publisherName: sql<string>`COALESCE((SELECT p.name FROM publishers p WHERE p.id = ${books.publisherId}), '')`,
@@ -606,6 +766,11 @@ export const getPublicBookByCode = async (db: DbClient, shortCode: string) => {
     summary: result.summary,
     dateAdded: result.dateAdded,
     coverImageKey: result.coverImageKey,
+    room: result.room,
+    cabinet: result.cabinet,
+    rack: result.rack,
+    shelf: result.shelf,
+    positionNote: result.positionNote,
     languageName: result.languageName,
     categoryName: result.categoryName,
     publisherName: result.publisherName,

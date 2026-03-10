@@ -13,7 +13,7 @@ export const ErrorState = ({
         onClick={retry}
         className="mt-3 rounded-lg border border-rose-300 bg-white px-3 py-1 text-sm hover:bg-rose-100"
       >
-        ???? ?????? ????
+        Try again
       </button>
     ) : null}
   </div>

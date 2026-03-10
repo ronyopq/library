@@ -25,16 +25,16 @@ export const BookFormPage = () => {
 
   return (
     <div className="space-y-4">
-      <header className="rounded-2xl border border-brand-200 bg-white p-4 shadow-soft">
+      <header className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
         <h2 className="font-heading text-xl">{isEdit ? "Edit Book" : "Add New Book"}</h2>
-        <p className="text-sm text-ink-500">ISBN lookup, OCR fallback ??? manual entry ???????</p>
+        <p className="text-sm text-app-muted">Use ISBN lookup, OCR fallback, or manual entry.</p>
       </header>
 
       <BookForm
         bookId={bookId}
         initialData={initialData}
         draftKey={getDraftKey(bookId)}
-        onSaved={(id) => navigate(`/books/${id}`)}
+        onSaved={(id) => navigate(`/admin/books/${id}`)}
       />
     </div>
   );

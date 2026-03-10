@@ -27,9 +27,9 @@ export const CoverCropper = ({ imageDataUrl, onCancel, onConfirm }: CoverCropper
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4">
-      <div className="w-full max-w-xl rounded-2xl border border-brand-200 bg-white p-4 shadow-soft">
-        <h3 className="font-heading text-lg">???? ???? ????</h3>
-        <p className="text-sm text-ink-500">????? ???? ????? ???????? ???????? ?????</p>
+      <div className="w-full max-w-xl rounded-2xl border border-app-border bg-white p-4 shadow-card">
+        <h3 className="font-heading text-lg">Crop Cover Image</h3>
+        <p className="text-sm text-app-muted">Select the best visible cover area before upload.</p>
 
         <div className="relative mt-3 h-72 overflow-hidden rounded-xl bg-slate-900">
           <Cropper
@@ -43,7 +43,7 @@ export const CoverCropper = ({ imageDataUrl, onCancel, onConfirm }: CoverCropper
           />
         </div>
 
-        <label className="mt-3 block text-sm text-ink-600">
+        <label className="mt-3 block text-sm text-app-muted">
           Zoom
           <input
             type="range"
@@ -57,16 +57,16 @@ export const CoverCropper = ({ imageDataUrl, onCancel, onConfirm }: CoverCropper
         </label>
 
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" onClick={onCancel} className="rounded-lg border border-brand-200 px-3 py-2 text-sm">
-            ?????
+          <button type="button" onClick={onCancel} className="rounded-lg border border-app-border px-3 py-2 text-sm">
+            Cancel
           </button>
           <button
             type="button"
             onClick={handleConfirm}
             disabled={saving}
-            className="rounded-lg bg-brand-600 px-3 py-2 text-sm text-white hover:bg-brand-700 disabled:opacity-60"
+            className="rounded-lg bg-app-primary px-3 py-2 text-sm text-white hover:bg-app-primary-strong disabled:opacity-60"
           >
-            {saving ? "?????? ?????..." : "???? ???????"}
+            {saving ? "Processing..." : "Save Crop"}
           </button>
         </div>
       </div>

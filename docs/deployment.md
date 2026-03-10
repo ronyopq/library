@@ -28,9 +28,11 @@ wrangler deploy
 
 ## 4) Verify key routes
 
-- `GET /` admin SPA
+- `GET /` public catalog SPA
+- `GET /admin/login` admin login
 - `GET /api/health` health check
-- `GET /api/dashboard` dashboard payload
+- `GET /api/public/summary` public payload
+- `GET /api/dashboard` dashboard payload (requires `ADMIN_TOKEN` if configured)
 - `GET /b/<publicCode>` public page (for public books)
 
 ## 5) Environment and secrets
@@ -40,8 +42,9 @@ Set optional secrets for production:
 ```bash
 wrangler secret put ADMIN_TOKEN
 wrangler secret put OCR_SPACE_API_KEY
-wrangler secret put PUBLIC_BASE_URL
 ```
+
+`PUBLIC_BASE_URL` can stay in `wrangler.toml` vars or be moved to secrets if preferred.
 
 ## 6) Suggested post-deploy checks
 

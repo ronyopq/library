@@ -11,7 +11,7 @@ const parsePublishedYear = (value?: string): number | undefined => {
 
 const mapLanguage = (code?: string): string | undefined => {
   if (!code) return undefined;
-  if (code === "bn") return "?????";
+  if (code === "bn") return "Bangla";
   if (code === "en") return "English";
   return undefined;
 };

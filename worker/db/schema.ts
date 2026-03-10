@@ -257,7 +257,7 @@ export const activityLogs = sqliteTable(
 
 export const librarySettings = sqliteTable("library_settings", {
   id: integer("id").primaryKey().default(1),
-  libraryName: text("library_name").notNull().default("???? ?????????"),
+  libraryName: text("library_name").notNull().default("My Library"),
   logoImageKey: text("logo_image_key"),
   publicBaseUrl: text("public_base_url"),
   dateFormat: text("date_format").notNull().default("yyyy-MM-dd"),

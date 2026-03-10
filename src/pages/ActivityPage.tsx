@@ -18,9 +18,9 @@ export const ActivityPage = () => {
 
   return (
     <div className="space-y-4">
-      <header className="rounded-2xl border border-brand-200 bg-white p-4 shadow-soft">
+      <header className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
         <h2 className="font-heading text-xl">Activity Log</h2>
-        <p className="text-sm text-ink-500">Book update, archive, loan, metadata lookup ???????</p>
+        <p className="text-sm text-app-muted">Book updates, archive actions, loans, and metadata lookups.</p>
       </header>
 
       {activities.length === 0 ? (
@@ -28,13 +28,13 @@ export const ActivityPage = () => {
       ) : (
         <section className="space-y-2">
           {activities.map((activity) => (
-            <article key={activity.id} className="rounded-2xl border border-brand-200 bg-white p-4 shadow-soft">
+            <article key={activity.id} className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="font-medium text-ink-900">{activity.message}</h3>
-                <span className="text-xs text-ink-400">{formatDate(activity.createdAt)}</span>
+                <h3 className="font-medium text-app-text">{activity.message}</h3>
+                <span className="text-xs text-app-muted">{formatDate(activity.createdAt)}</span>
               </div>
-              <p className="mt-1 text-xs text-ink-500">
-                {activity.action} • {activity.entityType} #{activity.entityId}
+              <p className="mt-1 text-xs text-app-muted">
+                {activity.action} - {activity.entityType} #{activity.entityId}
               </p>
             </article>
           ))}

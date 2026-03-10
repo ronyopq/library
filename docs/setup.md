@@ -64,6 +64,12 @@ npm run dev
 
 Vite proxies `/api`, `/b`, and `/i` to the Worker in development.
 
+Public/Admin routes:
+
+- Public catalog: `http://localhost:5173/`
+- Admin login: `http://localhost:5173/admin/login`
+- Admin panel: `http://localhost:5173/admin/dashboard`
+
 ## 6) Validate build and types
 
 ```bash
@@ -75,4 +81,4 @@ npm run build
 
 - Draft autosave is browser-local by design for low-friction mobile UX.
 - Cover files are stored in KV; suitable for personal library scale MVP.
-- If `ADMIN_TOKEN` is set, include `x-admin-token` in requests (UI has local token setting in Settings page).
+- If `ADMIN_TOKEN` is set, include `x-admin-token` in admin requests (UI stores token from `/admin/login`).

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import type { BookPayloadInput } from "@shared/schemas";
 import type { DuplicateMatch, IsbnLookupResult, OcrExtractionResult } from "@shared/types";
@@ -172,7 +172,7 @@ const mapInitialToForm = (initialData?: any): FormValues => {
 };
 
 const inputClass =
-  "w-full rounded-xl border border-brand-200 bg-white px-3 py-2 text-sm text-ink-700 placeholder:text-ink-400 focus:border-brand-500 focus:outline-none";
+  "w-full rounded-xl border border-app-border bg-white px-3 py-2 text-sm text-app-text placeholder:text-app-muted focus:border-app-primary focus:outline-none";
 
 export const BookForm = ({ bookId, initialData, draftKey, onSaved }: BookFormProps) => {
   const [coverPreview, setCoverPreview] = useState<string | undefined>(
@@ -349,7 +349,7 @@ export const BookForm = ({ bookId, initialData, draftKey, onSaved }: BookFormPro
   const handleIsbnLookup = async () => {
     const isbn = form.getValues("isbn13") || form.getValues("isbn10");
     if (!isbn) {
-      alert("ISBN ???");
+      alert("Please enter an ISBN first.");
       return;
     }
 
@@ -361,7 +361,7 @@ export const BookForm = ({ bookId, initialData, draftKey, onSaved }: BookFormPro
       });
       applyMetadata(result.merged);
       setMetadataSourceDetails(result.merged.metadataSourceDetails as Record<string, unknown> | undefined);
-      setOcrMessage(result.sources.length > 0 ? "ISBN metadata loaded" : "ISBN metadata not found. Use OCR/manual.");
+      setOcrMessage(result.sources.length > 0 ? "ISBN metadata loaded." : "No ISBN metadata found. Use OCR/manual entry.");
     } catch (error) {
       const maybeError = error as Error;
       alert(maybeError.message);
@@ -378,11 +378,11 @@ export const BookForm = ({ bookId, initialData, draftKey, onSaved }: BookFormPro
       const imageDataUrl = await fileToDataUrl(file);
       const result = await apiRequest<OcrExtractionResult>("/api/ocr/extract", {
         method: "POST",
-        body: JSON.stringify({ imageDataUrl, languageHint: form.getValues("languageName") || "bn" })
+        body: JSON.stringify({ imageDataUrl, languageHint: form.getValues("languageName") || "en" })
       });
 
       applyMetadata(result.extracted);
-      setOcrMessage(result.message ?? "OCR suggestion applied");
+      setOcrMessage(result.message ?? "OCR suggestions applied.");
     } catch (error) {
       const maybeError = error as Error;
       setOcrMessage(maybeError.message);
@@ -407,14 +407,14 @@ export const BookForm = ({ bookId, initialData, draftKey, onSaved }: BookFormPro
     setCoverPreview(uploaded.url);
   };
 
-  const sectionTitleClass = "mb-2 font-heading text-base text-ink-900";
+  const sectionTitleClass = "mb-2 font-heading text-base text-app-text";
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       {duplicates.length > 0 ? <DuplicateWarning duplicates={duplicates} onForceSave={handleForceSave} /> : null}
 
-      <section className="rounded-2xl border border-brand-200 bg-white p-4 shadow-soft">
-        <h2 className={sectionTitleClass}>ISBN Autofill + OCR</h2>
+      <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
+        <h2 className={sectionTitleClass}>ISBN Autofill and OCR</h2>
         <div className="grid gap-3 md:grid-cols-[1fr_auto]">
           <div className="grid grid-cols-2 gap-2">
             <input {...form.register("isbn10")} placeholder="ISBN-10" className={inputClass} />
@@ -424,39 +424,39 @@ export const BookForm = ({ bookId, initialData, draftKey, onSaved }: BookFormPro
             type="button"
             onClick={handleIsbnLookup}
             disabled={lookupLoading}
-            className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+            className="rounded-xl bg-app-primary px-4 py-2 text-sm font-medium text-white hover:bg-app-primary-strong disabled:opacity-60"
           >
-            {lookupLoading ? "Lookup..." : "ISBN ???? ????"}
+            {lookupLoading ? "Looking up..." : "Lookup ISBN"}
           </button>
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-brand-200 px-3 py-2 text-sm">
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-app-border px-3 py-2 text-sm">
             OCR Image Upload
             <input type="file" accept="image/*" className="hidden" onChange={(event) => handleOcrFile(event.target.files?.[0])} />
           </label>
-          {ocrLoading ? <span className="text-sm text-ink-500">OCR ????...</span> : null}
-          {ocrMessage ? <span className="text-sm text-ink-600">{ocrMessage}</span> : null}
+          {ocrLoading ? <span className="text-sm text-app-muted">Running OCR...</span> : null}
+          {ocrMessage ? <span className="text-sm text-app-muted">{ocrMessage}</span> : null}
         </div>
       </section>
 
-      <section className="rounded-2xl border border-brand-200 bg-white p-4 shadow-soft">
+      <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
         <h2 className={sectionTitleClass}>Cover Image</h2>
         <div className="flex flex-wrap items-center gap-4">
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-brand-200 px-3 py-2 text-sm">
-            ???? ?????
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-app-border px-3 py-2 text-sm">
+            Upload Cover
             <input type="file" accept="image/*" className="hidden" onChange={(event) => handleCoverSelect(event.target.files?.[0])} />
           </label>
           {coverPreview ? (
-            <img src={coverPreview} alt="Cover" className="h-28 w-20 rounded-md border border-brand-200 object-cover" />
+            <img src={coverPreview} alt="Cover" className="h-28 w-20 rounded-md border border-app-border object-cover" />
           ) : (
-            <p className="text-sm text-ink-500">???? ??? ??? ????</p>
+            <p className="text-sm text-app-muted">No cover uploaded yet.</p>
           )}
         </div>
       </section>
 
-      <section className="rounded-2xl border border-brand-200 bg-white p-4 shadow-soft">
-        <h2 className={sectionTitleClass}>Basic Metadata</h2>
+      <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
+        <h2 className={sectionTitleClass}>Book Metadata</h2>
         <div className="grid gap-3 md:grid-cols-2">
           <input {...form.register("title")} placeholder="Title (recommended)" className={inputClass} />
           <input {...form.register("subtitle")} placeholder="Subtitle" className={inputClass} />
@@ -479,8 +479,8 @@ export const BookForm = ({ bookId, initialData, draftKey, onSaved }: BookFormPro
         </div>
       </section>
 
-      <section className="rounded-2xl border border-brand-200 bg-white p-4 shadow-soft">
-        <h2 className={sectionTitleClass}>Location + Notes</h2>
+      <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
+        <h2 className={sectionTitleClass}>Location and Notes</h2>
         <div className="grid gap-3 md:grid-cols-2">
           <input {...form.register("room")} placeholder="Room" className={inputClass} />
           <input {...form.register("cabinet")} placeholder="Cabinet / Almirah" className={inputClass} />
@@ -494,7 +494,7 @@ export const BookForm = ({ bookId, initialData, draftKey, onSaved }: BookFormPro
         <textarea {...form.register("personalNotes")} placeholder="Personal Notes (private)" className={`${inputClass} mt-3 min-h-20`} />
       </section>
 
-      <section className="rounded-2xl border border-brand-200 bg-white p-4 shadow-soft">
+      <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
         <h2 className={sectionTitleClass}>Acquisition</h2>
         <div className="grid gap-3 md:grid-cols-2">
           <select {...form.register("acquisitionType")} className={inputClass}>
@@ -512,11 +512,11 @@ export const BookForm = ({ bookId, initialData, draftKey, onSaved }: BookFormPro
         <textarea {...form.register("acquisitionNote")} placeholder="Acquisition Note" className={`${inputClass} mt-3 min-h-20`} />
       </section>
 
-      <section className="rounded-2xl border border-brand-200 bg-white p-4 shadow-soft">
+      <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
         <h2 className={sectionTitleClass}>Visibility</h2>
         <div className="flex flex-wrap gap-4 text-sm">
           <label className="inline-flex items-center gap-2">
-            <input type="checkbox" {...form.register("isPublic")} /> Public page ? ?????
+            <input type="checkbox" {...form.register("isPublic")} /> Visible in public catalog
           </label>
           <label className="inline-flex items-center gap-2">
             <input type="checkbox" {...form.register("isFavorite")} /> Favorite
@@ -525,21 +525,21 @@ export const BookForm = ({ bookId, initialData, draftKey, onSaved }: BookFormPro
         <input {...form.register("metadataSource")} placeholder="Metadata Source" className={`${inputClass} mt-3`} />
       </section>
 
-      <div className="sticky bottom-3 z-10 flex justify-end gap-2 rounded-xl border border-brand-200 bg-white/90 p-3 backdrop-blur">
+      <div className="sticky bottom-3 z-10 flex justify-end gap-2 rounded-xl border border-app-border bg-white/90 p-3 backdrop-blur">
         <button
           type="button"
           onClick={() => {
             clearDraft(draftKey);
             form.reset(mapInitialToForm(initialData));
           }}
-          className="rounded-lg border border-brand-200 px-4 py-2 text-sm"
+          className="rounded-lg border border-app-border px-4 py-2 text-sm"
         >
-          Draft clear
+          Clear Draft
         </button>
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+          className="rounded-lg bg-app-primary px-4 py-2 text-sm font-medium text-white hover:bg-app-primary-strong disabled:opacity-60"
         >
           {submitting ? "Saving..." : "Save Book"}
         </button>

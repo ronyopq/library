@@ -5,7 +5,7 @@ import type { DbClient } from "../db/client";
 import { librarySettings } from "../db/schema";
 
 const defaultSettings: SettingsInput = {
-  libraryName: "???? ?????????",
+  libraryName: "My Library",
   logoImageKey: undefined,
   publicBaseUrl: undefined,
   dateFormat: "yyyy-MM-dd",

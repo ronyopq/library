@@ -15,7 +15,19 @@ import {
 import type { AppBindings } from "../env";
 import { getDb } from "../db/client";
 import { activityLogs } from "../db/schema";
-import { createBook, getBookById, listBooks, listLibraryOptions, restoreBook, updateBook, archiveBook } from "../services/bookService";
+import {
+  createBook,
+  getBookById,
+  listBooks,
+  listLibraryOptions,
+  restoreBook,
+  updateBook,
+  archiveBook,
+  deleteBookPermanently,
+  getPublicBookByCode,
+  getPublicCatalogSummary,
+  listPublicBooks
+} from "../services/bookService";
 import { getDashboardStats } from "../services/dashboardService";
 import { findDuplicateMatches } from "../services/duplicateService";
 import { exportBooksCsv, exportLoansCsv } from "../services/exportService";
@@ -52,14 +64,53 @@ const imageUploadSchema = z.object({
 
 export const apiRouter = new Hono<AppBindings>();
 
-apiRouter.use("*", requireAdmin);
-
 apiRouter.get("/health", (c) =>
   c.json({
     ok: true,
     ts: new Date().toISOString()
   })
 );
+
+apiRouter.get("/public/books", async (c) => {
+  const db = getDb(c.env);
+  const result = await listPublicBooks(db, {
+    search: c.req.query("search") ?? undefined,
+    location: c.req.query("location") ?? undefined,
+    category: c.req.query("category") ?? undefined,
+    language: c.req.query("language") ?? undefined,
+    limit: c.req.query("limit") ? Number(c.req.query("limit")) : 80,
+    offset: c.req.query("offset") ? Number(c.req.query("offset")) : 0
+  });
+
+  return c.json(result);
+});
+
+apiRouter.get("/public/books/:shortCode", async (c) => {
+  const db = getDb(c.env);
+  const book = await getPublicBookByCode(db, c.req.param("shortCode"));
+  if (!book) {
+    return notFound(c, "Public book not found");
+  }
+
+  return c.json({ book });
+});
+
+apiRouter.get("/public/summary", async (c) => {
+  const db = getDb(c.env);
+  const summary = await getPublicCatalogSummary(db);
+  return c.json(summary);
+});
+
+apiRouter.use("/books*", requireAdmin);
+apiRouter.use("/isbn/*", requireAdmin);
+apiRouter.use("/ocr/*", requireAdmin);
+apiRouter.use("/images/*", requireAdmin);
+apiRouter.use("/dashboard", requireAdmin);
+apiRouter.use("/loans*", requireAdmin);
+apiRouter.use("/settings*", requireAdmin);
+apiRouter.use("/activity", requireAdmin);
+apiRouter.use("/options", requireAdmin);
+apiRouter.use("/export/*", requireAdmin);
 
 apiRouter.get("/books", async (c) => {
   const db = getDb(c.env);
@@ -170,6 +221,19 @@ apiRouter.post("/books/:id/restore", async (c) => {
 
   const db = getDb(c.env);
   await restoreBook(db, id);
+
+  return c.json({ ok: true });
+});
+
+apiRouter.delete("/books/:id", async (c) => {
+  const id = parseBookId(c.req.param("id"));
+  if (!id) return badRequest(c, "Invalid book id");
+
+  const db = getDb(c.env);
+  const deleted = await deleteBookPermanently(db, id);
+  if (!deleted) {
+    return notFound(c, "Book not found");
+  }
 
   return c.json({ ok: true });
 });

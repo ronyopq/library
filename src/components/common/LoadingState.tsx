@@ -1,5 +1,5 @@
-export const LoadingState = ({ label = "??? ?????..." }: { label?: string }) => (
-  <div className="rounded-2xl border border-emerald-100 bg-white/80 p-6 text-center text-sm text-ink-500 shadow-soft">
+export const LoadingState = ({ label = "Loading..." }: { label?: string }) => (
+  <div className="rounded-2xl border border-app-border bg-white p-6 text-center text-sm text-app-muted shadow-card">
     {label}
   </div>
 );
