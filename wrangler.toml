@@ -9,12 +9,14 @@ binding = "ASSETS"
 [[d1_databases]]
 binding = "DB"
 database_name = "library-db"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "0a33e3cb-7d6f-42b0-9863-107283cc9409"
+migrations_dir = "drizzle"
 
 [[kv_namespaces]]
 binding = "LIBRARY_KV"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
-preview_id = "REPLACE_WITH_KV_PREVIEW_ID"
+id = "644f4fd58e804cc88f2ed1dbbe94b734"
+preview_id = "19cb9d4bc3b14bf6bbc59e4f56481fb8"
 
 [vars]
 APP_ENV = "production"
+PUBLIC_BASE_URL = "https://library-6ny.pages.dev"
