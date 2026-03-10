@@ -1,0 +1,3 @@
+/api/* https://personal-library.ronybd.workers.dev/api/:splat 200
+/i/* https://personal-library.ronybd.workers.dev/i/:splat 200
+/b/* https://personal-library.ronybd.workers.dev/b/:splat 200
