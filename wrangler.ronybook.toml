@@ -1,0 +1,22 @@
+name = "ronybook-worker"
+main = "worker/index.ts"
+compatibility_date = "2026-03-10"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ronybook-db"
+database_id = "deb5b83e-5e68-4b61-8adc-b975cef9c13f"
+migrations_dir = "drizzle"
+
+[[kv_namespaces]]
+binding = "LIBRARY_KV"
+id = "c295af1aa4c54c2ab0393c29557dcc1c"
+preview_id = "c295af1aa4c54c2ab0393c29557dcc1c"
+
+[vars]
+APP_ENV = "production"
+PUBLIC_BASE_URL = "https://ronybook.pages.dev"

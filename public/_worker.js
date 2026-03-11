@@ -7,7 +7,7 @@ const workerByHost = [
   },
   {
     suffix: ".ronybook.pages.dev",
-    origin: "https://personal-library.ronybd.workers.dev"
+    origin: "https://ronybook-worker.ronybd.workers.dev"
   },
   {
     suffix: ".library-6ny.pages.dev",
