@@ -6,6 +6,7 @@ import { ErrorState } from "@/components/common/ErrorState";
 import { LoadingState } from "@/components/common/LoadingState";
 import { Pagination } from "@/components/common/Pagination";
 import { apiRequest } from "@/lib/api";
+import { appConfirm } from "@/lib/appDialog";
 
 interface BooksResponse {
   items: any[];
@@ -70,9 +71,10 @@ export const ArchivedPage = () => {
               key={book.id}
               book={book}
               onRestore={(item) => restoreMutation.mutate(item.id)}
-              onDelete={(item) => {
-                const confirmed = window.confirm(
-                  `Delete "${item.title || item.accessionCode}" permanently? This cannot be undone.`
+              onDelete={async (item) => {
+                const confirmed = await appConfirm(
+                  `Delete "${item.title || item.accessionCode}" permanently? This cannot be undone.`,
+                  "Delete Book"
                 );
                 if (!confirmed) return;
                 deleteMutation.mutate(item.id);

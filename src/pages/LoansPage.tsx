@@ -6,6 +6,7 @@ import { ErrorState } from "@/components/common/ErrorState";
 import { LoadingState } from "@/components/common/LoadingState";
 import { Pagination } from "@/components/common/Pagination";
 import { apiRequest } from "@/lib/api";
+import { appAlert, appConfirm } from "@/lib/appDialog";
 import { formatDate, isOverdue } from "@/lib/date";
 
 interface BorrowFormState {
@@ -172,7 +173,7 @@ export const LoansPage = () => {
       queryClient.invalidateQueries({ queryKey: ["borrow-demands"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
-    onError: (error) => alert((error as Error).message)
+    onError: (error) => appAlert((error as Error).message)
   });
 
   const markReturnedMutation = useMutation({
@@ -186,7 +187,7 @@ export const LoansPage = () => {
       queryClient.invalidateQueries({ queryKey: ["books"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
-    onError: (error) => alert((error as Error).message)
+    onError: (error) => appAlert((error as Error).message)
   });
 
   const deleteBorrowMutation = useMutation({
@@ -199,7 +200,7 @@ export const LoansPage = () => {
       queryClient.invalidateQueries({ queryKey: ["books"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
-    onError: (error) => alert((error as Error).message)
+    onError: (error) => appAlert((error as Error).message)
   });
 
   const decideDemandMutation = useMutation({
@@ -228,7 +229,7 @@ export const LoansPage = () => {
       queryClient.invalidateQueries({ queryKey: ["books"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
-    onError: (error) => alert((error as Error).message)
+    onError: (error) => appAlert((error as Error).message)
   });
 
   const books = booksQuery.data?.items ?? [];
@@ -317,7 +318,7 @@ export const LoansPage = () => {
     }
 
     if (!matchedBook) {
-      alert("No matching book or copy found.");
+      appAlert("No matching book or copy found.");
       return;
     }
 
@@ -692,8 +693,9 @@ export const LoansPage = () => {
                             ) : null}
                             <button
                               type="button"
-                              onClick={() => {
-                                if (!confirm("Delete this borrow record?")) return;
+                              onClick={async () => {
+                                const confirmed = await appConfirm("Delete this borrow record?", "Delete Borrow");
+                                if (!confirmed) return;
                                 deleteBorrowMutation.mutate(borrow.id);
                               }}
                               className="rounded-lg border border-rose-200 px-3 py-1 text-xs text-rose-700"

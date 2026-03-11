@@ -4,6 +4,7 @@ import type { AuthUser, StaffRole } from "@shared/types";
 import { ErrorState } from "@/components/common/ErrorState";
 import { LoadingState } from "@/components/common/LoadingState";
 import { apiRequest } from "@/lib/api";
+import { appAlert } from "@/lib/appDialog";
 
 interface CreateUserForm {
   username: string;
@@ -41,7 +42,7 @@ export const UsersPage = () => {
       queryClient.invalidateQueries({ queryKey: ["staff-users"] });
     },
     onError: (error) => {
-      alert((error as Error).message);
+      appAlert((error as Error).message);
     }
   });
 

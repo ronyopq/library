@@ -6,6 +6,7 @@ import { resolveCoverImageUrl } from "@/lib/cover";
 import { ErrorState } from "@/components/common/ErrorState";
 import { LoadingState } from "@/components/common/LoadingState";
 import { formatDate } from "@/lib/date";
+import { appAlert } from "@/lib/appDialog";
 
 interface PublicBookResponse {
   canViewPrivateContact: boolean;
@@ -104,7 +105,7 @@ export const PublicBookPage = () => {
       queryClient.invalidateQueries({ queryKey: ["public-book", shortCode] });
     },
     onError: (error) => {
-      alert((error as Error).message);
+      appAlert((error as Error).message);
     }
   });
 

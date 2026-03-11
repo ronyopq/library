@@ -7,6 +7,7 @@ import { LoadingState } from "@/components/common/LoadingState";
 import { Pagination } from "@/components/common/Pagination";
 import { useDebounce } from "@/hooks/useDebounce";
 import { apiRequest } from "@/lib/api";
+import { appAlert, appConfirm } from "@/lib/appDialog";
 import { formatDate } from "@/lib/date";
 
 interface AdminReview {
@@ -64,7 +65,7 @@ export const ReviewsPage = () => {
       queryClient.invalidateQueries({ queryKey: ["admin-reviews"] });
       queryClient.invalidateQueries({ queryKey: ["public-book"] });
     },
-    onError: (error) => alert((error as Error).message)
+    onError: (error) => appAlert((error as Error).message)
   });
 
   const deleteMutation = useMutation({
@@ -76,7 +77,7 @@ export const ReviewsPage = () => {
       queryClient.invalidateQueries({ queryKey: ["admin-reviews"] });
       queryClient.invalidateQueries({ queryKey: ["public-book"] });
     },
-    onError: (error) => alert((error as Error).message)
+    onError: (error) => appAlert((error as Error).message)
   });
 
   const reviews = query.data?.reviews ?? [];
@@ -217,8 +218,9 @@ export const ReviewsPage = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (!confirm("Delete this review?")) return;
+                  onClick={async () => {
+                    const confirmed = await appConfirm("Delete this review?", "Delete Review");
+                    if (!confirmed) return;
                     deleteMutation.mutate(review.id);
                   }}
                   className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs text-rose-700"

@@ -8,7 +8,7 @@ export const AdminLayout = () => {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const currentUser = getStoredAuthUser();
-  const canManageUsers = isCurrentUserAdmin();
+  const isAdmin = isCurrentUserAdmin();
 
   const navItems = useMemo(
     () => [
@@ -17,13 +17,17 @@ export const AdminLayout = () => {
       { to: "/admin/books", label: "Borrow Timeline", icon: History },
       { to: "/admin/books/new", label: "Add Book", icon: Boxes },
       { to: "/admin/borrow", label: "Borrow Menu", icon: UsersRound },
-      { to: "/admin/reviews", label: "Reviews", icon: MessageSquareText },
       { to: "/admin/labels", label: "Barcode Print", icon: Printer },
-      { to: "/admin/activity", label: "Activity", icon: ScrollText },
-      { to: "/admin/settings", label: "Settings", icon: Settings },
-      ...(canManageUsers ? [{ to: "/admin/users", label: "Staff Users", icon: ShieldCheck }] : [])
+      ...(isAdmin
+        ? [
+            { to: "/admin/reviews", label: "Reviews", icon: MessageSquareText },
+            { to: "/admin/activity", label: "Activity", icon: ScrollText },
+            { to: "/admin/settings", label: "Settings", icon: Settings },
+            { to: "/admin/users", label: "Staff Users", icon: ShieldCheck }
+          ]
+        : [])
     ],
-    [canManageUsers]
+    [isAdmin]
   );
 
   return (

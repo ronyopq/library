@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorState } from "@/components/common/ErrorState";
 import { LoadingState } from "@/components/common/LoadingState";
 import { apiRequest } from "@/lib/api";
+import { appAlert, appConfirm } from "@/lib/appDialog";
 import { getStoredAuthUser, isCurrentUserAdmin } from "@/lib/adminAuth";
 
 interface SettingsForm {
@@ -95,7 +96,7 @@ export const SettingsPage = () => {
       queryClient.invalidateQueries({ queryKey: ["settings"] });
     },
     onError: (error) => {
-      alert((error as Error).message);
+      appAlert((error as Error).message);
     }
   });
 
@@ -110,7 +111,7 @@ export const SettingsPage = () => {
       queryClient.invalidateQueries({ queryKey: ["options-catalog"] });
       queryClient.invalidateQueries({ queryKey: ["library-options"] });
     },
-    onError: (error) => alert((error as Error).message)
+    onError: (error) => appAlert((error as Error).message)
   });
 
   const updateOptionMutation = useMutation({
@@ -128,7 +129,7 @@ export const SettingsPage = () => {
       queryClient.invalidateQueries({ queryKey: ["options-catalog"] });
       queryClient.invalidateQueries({ queryKey: ["library-options"] });
     },
-    onError: (error) => alert((error as Error).message)
+    onError: (error) => appAlert((error as Error).message)
   });
 
   const deleteOptionMutation = useMutation({
@@ -140,7 +141,7 @@ export const SettingsPage = () => {
       queryClient.invalidateQueries({ queryKey: ["options-catalog"] });
       queryClient.invalidateQueries({ queryKey: ["library-options"] });
     },
-    onError: (error) => alert((error as Error).message)
+    onError: (error) => appAlert((error as Error).message)
   });
 
   if (query.isLoading || !form || catalogQuery.isLoading) return <LoadingState />;
@@ -277,8 +278,9 @@ export const SettingsPage = () => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        if (!confirm(`Delete "${item.name}"?`)) return;
+                      onClick={async () => {
+                        const confirmed = await appConfirm(`Delete "${item.name}"?`, "Delete Option");
+                        if (!confirmed) return;
                         deleteOptionMutation.mutate({ domain, id: item.id });
                       }}
                       disabled={!canManageCatalog}

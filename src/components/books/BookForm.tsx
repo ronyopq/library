@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import type { BookPayloadInput } from "@shared/schemas";
 import type { DuplicateMatch, IsbnLookupResult, LibraryOptions, OcrExtractionResult } from "@shared/types";
 import { apiRequest } from "@/lib/api";
+import { appAlert } from "@/lib/appDialog";
 import { clearDraft, loadDraft, saveDraft } from "@/lib/draftStore";
 import { resolveCoverImageUrl } from "@/lib/cover";
 import { fileToDataUrl } from "@/lib/crop";
@@ -343,7 +344,7 @@ export const BookForm = ({ bookId, initialData, options, draftKey, onSaved }: Bo
         setDuplicates(maybeError.details.duplicates as DuplicateMatch[]);
         setPendingPayload(payload);
       } else {
-        alert(maybeError.message || "Failed to save book");
+        appAlert(maybeError.message || "Failed to save book");
       }
     } finally {
       setSubmitting(false);
@@ -359,7 +360,7 @@ export const BookForm = ({ bookId, initialData, options, draftKey, onSaved }: Bo
       onSaved(id);
     } catch (error) {
       const maybeError = error as Error;
-      alert(maybeError.message || "Save failed");
+      appAlert(maybeError.message || "Save failed");
     } finally {
       setSubmitting(false);
     }
@@ -390,7 +391,7 @@ export const BookForm = ({ bookId, initialData, options, draftKey, onSaved }: Bo
   const handleIsbnLookup = async () => {
     const isbn = form.getValues("isbn13") || form.getValues("isbn10");
     if (!isbn) {
-      alert("Please enter an ISBN first.");
+      appAlert("Please enter an ISBN first.");
       return;
     }
 
@@ -405,7 +406,7 @@ export const BookForm = ({ bookId, initialData, options, draftKey, onSaved }: Bo
       setOcrMessage(result.sources.length > 0 ? "ISBN metadata loaded." : "No ISBN metadata found. Use OCR/manual entry.");
     } catch (error) {
       const maybeError = error as Error;
-      alert(maybeError.message);
+      appAlert(maybeError.message);
     } finally {
       setLookupLoading(false);
     }

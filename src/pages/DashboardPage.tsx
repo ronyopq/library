@@ -7,12 +7,15 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
 import { LoadingState } from "@/components/common/LoadingState";
 import { apiRequest } from "@/lib/api";
+import { isCurrentUserAdmin } from "@/lib/adminAuth";
 import { formatDate } from "@/lib/date";
 
 const cardStyle =
   "rounded-2xl border border-app-border bg-white p-4 shadow-card transition hover:-translate-y-0.5 hover:border-app-primary";
 
 export const DashboardPage = () => {
+  const isAdmin = isCurrentUserAdmin();
+
   const query = useQuery({
     queryKey: ["dashboard"],
     queryFn: () => apiRequest<DashboardStats>("/api/dashboard")
@@ -25,26 +28,29 @@ export const DashboardPage = () => {
 
   const reviewsQuery = useQuery({
     queryKey: ["admin-reviews", "dashboard-notify"],
-    queryFn: () => apiRequest<{ reviews: any[] }>("/api/reviews", { params: { limit: 6 } })
+    queryFn: () => apiRequest<{ reviews: any[] }>("/api/reviews", { params: { limit: 6 } }),
+    enabled: isAdmin
   });
 
-  if (query.isLoading || requestQuery.isLoading || reviewsQuery.isLoading) {
+  if (query.isLoading || requestQuery.isLoading || (isAdmin && reviewsQuery.isLoading)) {
     return <LoadingState />;
   }
 
-  if (query.isError || requestQuery.isError || reviewsQuery.isError) {
+  if (query.isError || requestQuery.isError || (isAdmin && reviewsQuery.isError)) {
     return (
       <ErrorState
         message={
           (query.error as Error)?.message ||
           (requestQuery.error as Error)?.message ||
-          (reviewsQuery.error as Error)?.message ||
+          (isAdmin ? (reviewsQuery.error as Error)?.message : "") ||
           "Failed to load dashboard"
         }
         retry={() => {
           query.refetch();
           requestQuery.refetch();
-          reviewsQuery.refetch();
+          if (isAdmin) {
+            reviewsQuery.refetch();
+          }
         }}
       />
     );
@@ -122,30 +128,32 @@ export const DashboardPage = () => {
             )}
           </article>
 
-          <article className="rounded-xl border border-app-border p-3">
-            <div className="flex items-center justify-between">
-              <p className="font-medium">New Comments and Ratings</p>
-              <Link to="/admin/reviews" className="text-xs text-app-primary hover:underline">
-                Open Reviews
-              </Link>
-            </div>
-            {newReviews.length === 0 ? (
-              <p className="mt-2 text-sm text-app-muted">No recent comments.</p>
-            ) : (
-              <ul className="mt-2 space-y-2 text-sm">
-                {newReviews.slice(0, 5).map((item) => (
-                  <li key={item.id} className="rounded-lg bg-app-surface p-2">
-                    <Link to={`/admin/reviews?reviewId=${item.id}`} className="block">
-                      <p className="font-medium">{item.bookTitle || "Unknown book"}</p>
-                      <p className="text-xs text-app-muted">
-                        {item.reviewerName} - {item.rating} star - {formatDate(item.createdAt)}
-                      </p>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </article>
+          {isAdmin ? (
+            <article className="rounded-xl border border-app-border p-3">
+              <div className="flex items-center justify-between">
+                <p className="font-medium">New Comments and Ratings</p>
+                <Link to="/admin/reviews" className="text-xs text-app-primary hover:underline">
+                  Open Reviews
+                </Link>
+              </div>
+              {newReviews.length === 0 ? (
+                <p className="mt-2 text-sm text-app-muted">No recent comments.</p>
+              ) : (
+                <ul className="mt-2 space-y-2 text-sm">
+                  {newReviews.slice(0, 5).map((item) => (
+                    <li key={item.id} className="rounded-lg bg-app-surface p-2">
+                      <Link to={`/admin/reviews?reviewId=${item.id}`} className="block">
+                        <p className="font-medium">{item.bookTitle || "Unknown book"}</p>
+                        <p className="text-xs text-app-muted">
+                          {item.reviewerName} - {item.rating} star - {formatDate(item.createdAt)}
+                        </p>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </article>
+          ) : null}
         </div>
       </section>
 

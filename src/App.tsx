@@ -56,11 +56,11 @@ export default function App() {
           <Route path="/admin/borrow" element={<LoansPage />} />
           <Route path="/admin/loans" element={<Navigate to="/admin/borrow" replace />} />
           <Route path="/admin/labels" element={<PrintLabelsPage />} />
-          <Route path="/admin/activity" element={<ActivityPage />} />
-          <Route path="/admin/reviews" element={<ReviewsPage />} />
-          <Route path="/admin/settings" element={<SettingsPage />} />
           <Route path="/admin/archived" element={<ArchivedPage />} />
           <Route element={<AdminOnlyGuard />}>
+            <Route path="/admin/activity" element={<ActivityPage />} />
+            <Route path="/admin/reviews" element={<ReviewsPage />} />
+            <Route path="/admin/settings" element={<SettingsPage />} />
             <Route path="/admin/users" element={<UsersPage />} />
           </Route>
         </Route>

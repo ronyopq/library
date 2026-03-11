@@ -5,12 +5,15 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./styles.css";
 import { queryClient } from "@/lib/queryClient";
+import { AppDialogProvider } from "@/components/common/AppDialogProvider";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <App />
+        <AppDialogProvider>
+          <App />
+        </AppDialogProvider>
       </BrowserRouter>
     </QueryClientProvider>
   </React.StrictMode>
