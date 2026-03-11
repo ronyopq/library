@@ -231,9 +231,6 @@ export const LoansPage = () => {
     onError: (error) => alert((error as Error).message)
   });
 
-  if (!booksQuery.data && booksQuery.isLoading) return <LoadingState />;
-  if (booksQuery.isError) return <ErrorState message={(booksQuery.error as Error).message} retry={() => booksQuery.refetch()} />;
-
   const books = booksQuery.data?.items ?? [];
   const borrows = borrowsQuery.data?.loans ?? [];
   const demands = demandsQuery.data?.requests ?? [];
@@ -359,6 +356,9 @@ export const LoansPage = () => {
   useEffect(() => {
     setHistoryPage(1);
   }, [historySearch, queryStatusFilter]);
+
+  if (!booksQuery.data && booksQuery.isLoading) return <LoadingState />;
+  if (booksQuery.isError) return <ErrorState message={(booksQuery.error as Error).message} retry={() => booksQuery.refetch()} />;
 
   return (
     <div className="space-y-4">

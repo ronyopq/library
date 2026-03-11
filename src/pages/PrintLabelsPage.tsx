@@ -64,22 +64,28 @@ export const PrintLabelsPage = () => {
     queryFn: () => apiRequest<{ settings: any }>("/api/settings")
   });
 
-  if ((!booksQuery.data && booksQuery.isLoading) || settingsQuery.isLoading) return <LoadingState />;
-  if (booksQuery.isError || settingsQuery.isError) {
-    return <ErrorState message={(booksQuery.error as Error)?.message || (settingsQuery.error as Error)?.message || "Failed"} />;
-  }
-
   const books = booksQuery.data?.items ?? [];
   const settings = settingsQuery.data?.settings;
+  const effectiveSettings = {
+    libraryName: settings?.libraryName ?? "Personal Library",
+    publicBaseUrl: settings?.publicBaseUrl ?? "",
+    labelIncludeTitle: settings?.labelIncludeTitle ?? true,
+    labelIncludeAuthor: settings?.labelIncludeAuthor ?? true,
+    labelIncludeDate: settings?.labelIncludeDate ?? false,
+    labelIncludeQr: settings?.labelIncludeQr ?? true,
+    labelColumns: settings?.labelColumns ?? 3,
+    labelWidthMm: settings?.labelWidthMm ?? 50,
+    labelHeightMm: settings?.labelHeightMm ?? 30
+  };
 
   const displaySettings = {
-    labelIncludeTitle: overrideOptions.labelIncludeTitle ?? settings.labelIncludeTitle,
-    labelIncludeAuthor: overrideOptions.labelIncludeAuthor ?? settings.labelIncludeAuthor,
-    labelIncludeDate: overrideOptions.labelIncludeDate ?? settings.labelIncludeDate,
-    labelIncludeQr: overrideOptions.labelIncludeQr ?? settings.labelIncludeQr,
-    labelColumns: overrideOptions.labelColumns ?? settings.labelColumns,
-    labelWidthMm: overrideOptions.labelWidthMm ?? settings.labelWidthMm,
-    labelHeightMm: overrideOptions.labelHeightMm ?? settings.labelHeightMm
+    labelIncludeTitle: overrideOptions.labelIncludeTitle ?? effectiveSettings.labelIncludeTitle,
+    labelIncludeAuthor: overrideOptions.labelIncludeAuthor ?? effectiveSettings.labelIncludeAuthor,
+    labelIncludeDate: overrideOptions.labelIncludeDate ?? effectiveSettings.labelIncludeDate,
+    labelIncludeQr: overrideOptions.labelIncludeQr ?? effectiveSettings.labelIncludeQr,
+    labelColumns: overrideOptions.labelColumns ?? effectiveSettings.labelColumns,
+    labelWidthMm: overrideOptions.labelWidthMm ?? effectiveSettings.labelWidthMm,
+    labelHeightMm: overrideOptions.labelHeightMm ?? effectiveSettings.labelHeightMm
   };
 
   const allLabelItems = useMemo<LabelItem[]>(
@@ -153,6 +159,11 @@ export const PrintLabelsPage = () => {
 
   const pageCss =
     paperSize === "Custom" ? "" : `@media print { @page { size: ${paperSize}; margin: 8mm; } body { margin: 0; } }`;
+
+  if ((!booksQuery.data && booksQuery.isLoading) || settingsQuery.isLoading) return <LoadingState />;
+  if (booksQuery.isError || settingsQuery.isError) {
+    return <ErrorState message={(booksQuery.error as Error)?.message || (settingsQuery.error as Error)?.message || "Failed"} />;
+  }
 
   return (
     <div className="space-y-4">
@@ -336,8 +347,8 @@ export const PrintLabelsPage = () => {
           >
             <LabelPreview
               item={item}
-              libraryName={settings.libraryName}
-              publicBaseUrl={settings.publicBaseUrl}
+              libraryName={effectiveSettings.libraryName}
+              publicBaseUrl={effectiveSettings.publicBaseUrl}
               includeTitle={displaySettings.labelIncludeTitle}
               includeAuthor={displaySettings.labelIncludeAuthor}
               includeDate={displaySettings.labelIncludeDate}

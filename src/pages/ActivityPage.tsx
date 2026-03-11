@@ -16,14 +16,14 @@ export const ActivityPage = () => {
     queryFn: () => apiRequest<{ activities: any[] }>("/api/activity", { params: { limit: 500 } })
   });
 
-  if (query.isLoading) return <LoadingState />;
-  if (query.isError) return <ErrorState message={(query.error as Error).message} retry={() => query.refetch()} />;
-
   const activities = query.data?.activities ?? [];
   const pagedActivities = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
     return activities.slice(start, start + PAGE_SIZE);
   }, [activities, page]);
+
+  if (query.isLoading) return <LoadingState />;
+  if (query.isError) return <ErrorState message={(query.error as Error).message} retry={() => query.refetch()} />;
 
   return (
     <div className="space-y-4">

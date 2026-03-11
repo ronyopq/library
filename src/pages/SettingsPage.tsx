@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorState } from "@/components/common/ErrorState";
 import { LoadingState } from "@/components/common/LoadingState";
@@ -44,6 +44,7 @@ const domainLabels: Record<OptionDomain, string> = {
   publisher: "Publishers",
   tag: "Tags"
 };
+const optionDomains: OptionDomain[] = ["category", "language", "publisher", "tag"];
 
 export const SettingsPage = () => {
   const queryClient = useQueryClient();
@@ -153,7 +154,6 @@ export const SettingsPage = () => {
   };
 
   const catalog = catalogQuery.data;
-  const domains = useMemo(() => Object.keys(domainLabels) as OptionDomain[], []);
 
   return (
     <div className="space-y-4">
@@ -231,7 +231,7 @@ export const SettingsPage = () => {
         ) : null}
 
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
-          {domains.map((domain) => (
+          {optionDomains.map((domain) => (
             <article key={domain} className="rounded-xl border border-app-border p-3">
               <h4 className="font-medium">{domainLabels[domain]}</h4>
               <div className="mt-2 flex gap-2">
