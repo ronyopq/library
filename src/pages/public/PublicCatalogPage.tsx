@@ -22,6 +22,9 @@ interface PublicBooksResponse {
     shelf?: string;
     positionNote?: string;
     coverImageKey?: string;
+    copyCount: number;
+    availableCopyCount: number;
+    borrowedCopyCount: number;
     dateAdded: string;
   }>;
   total: number;
@@ -113,6 +116,9 @@ export const PublicCatalogPage = () => {
                     <p className="mt-0.5 line-clamp-1 text-sm text-app-muted">{book.authors.join(", ") || "Unknown author"}</p>
                     <p className="mt-1 text-xs text-app-muted">{book.category || "Uncategorized"} - {book.language || "Unknown"}</p>
                     <p className="mt-1 text-xs text-app-muted">Shelf: {locationText || "Not specified"}</p>
+                    <p className="mt-1 text-xs text-app-muted">
+                      Copies: {book.copyCount} ({book.availableCopyCount} available, {book.borrowedCopyCount} borrowed)
+                    </p>
                   </div>
                 </div>
               </Link>

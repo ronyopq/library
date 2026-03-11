@@ -5,8 +5,10 @@ import { apiRequest } from "@/lib/api";
 import { resolveCoverImageUrl } from "@/lib/cover";
 import { ErrorState } from "@/components/common/ErrorState";
 import { LoadingState } from "@/components/common/LoadingState";
+import { formatDate } from "@/lib/date";
 
 interface PublicBookResponse {
+  canViewPrivateContact: boolean;
   book: {
     publicCode: string;
     accessionCode: string;
@@ -25,13 +27,31 @@ interface PublicBookResponse {
     rack?: string;
     shelf?: string;
     positionNote?: string;
+    copyCount: number;
+    availableCopyCount: number;
+    borrowedCopyCount: number;
+    lostCopyCount: number;
+    copies: Array<{
+      id: number;
+      copyCode: string;
+      status: string;
+    }>;
+    activeLoans: Array<{
+      copyCode: string;
+      borrowerName?: string;
+      borrowerPhone?: string;
+      borrowerPhoneMasked?: string;
+      borrowedAt?: string;
+      expectedReturnAt?: string;
+    }>;
   };
   averageRating: number;
   ratingCount: number;
   reviews: Array<{
     id: number;
     reviewerName: string;
-    reviewerPhone: string;
+    reviewerPhone?: string;
+    reviewerPhoneMasked?: string;
     rating: number;
     comment: string;
     createdAt: string;
@@ -48,6 +68,15 @@ export const PublicBookPage = () => {
     rating: 5,
     comment: ""
   });
+  const [requestForm, setRequestForm] = useState({
+    requesterName: "",
+    requesterPhone: "",
+    requesterEmail: "",
+    expectedReturnAt: "",
+    requestedCopyId: "",
+    note: ""
+  });
+  const [requestMessage, setRequestMessage] = useState("");
 
   const query = useQuery({
     queryKey: ["public-book", shortCode],
@@ -72,6 +101,35 @@ export const PublicBookPage = () => {
     },
     onError: (error) => {
       alert((error as Error).message);
+    }
+  });
+
+  const requestMutation = useMutation({
+    mutationFn: () =>
+      apiRequest(`/api/public/books/${shortCode}/borrow-requests`, {
+        method: "POST",
+        body: JSON.stringify({
+          requesterName: requestForm.requesterName,
+          requesterPhone: requestForm.requesterPhone,
+          requesterEmail: requestForm.requesterEmail || undefined,
+          expectedReturnAt: requestForm.expectedReturnAt || undefined,
+          requestedCopyId: requestForm.requestedCopyId ? Number(requestForm.requestedCopyId) : undefined,
+          note: requestForm.note || undefined
+        })
+      }),
+    onSuccess: () => {
+      setRequestForm({
+        requesterName: "",
+        requesterPhone: "",
+        requesterEmail: "",
+        expectedReturnAt: "",
+        requestedCopyId: "",
+        note: ""
+      });
+      setRequestMessage("Borrow request submitted. Admin will review and approve.");
+    },
+    onError: (error) => {
+      setRequestMessage((error as Error).message);
     }
   });
 
@@ -103,16 +161,57 @@ export const PublicBookPage = () => {
           {book.subtitle ? <p className="mt-1 text-app-muted">{book.subtitle}</p> : null}
 
           <div className="mt-4 grid gap-2 text-sm text-app-text md:grid-cols-2">
-            <p><strong>Author:</strong> {book.authors.join(", ") || "Unknown"}</p>
-            <p><strong>Publisher:</strong> {book.publisherName || "Unknown"}</p>
-            <p><strong>Category:</strong> {book.categoryName || "Uncategorized"}</p>
-            <p><strong>Language:</strong> {book.languageName || "Unknown"}</p>
-            <p><strong>Shelf:</strong> {location || "Not specified"}</p>
-            <p><strong>Code:</strong> {book.publicCode}</p>
+            <p>
+              <strong>Author:</strong> {book.authors.join(", ") || "Unknown"}
+            </p>
+            <p>
+              <strong>Publisher:</strong> {book.publisherName || "Unknown"}
+            </p>
+            <p>
+              <strong>Category:</strong> {book.categoryName || "Uncategorized"}
+            </p>
+            <p>
+              <strong>Language:</strong> {book.languageName || "Unknown"}
+            </p>
+            <p>
+              <strong>Shelf:</strong> {location || "Not specified"}
+            </p>
+            <p>
+              <strong>Code:</strong> {book.publicCode}
+            </p>
+            <p>
+              <strong>Copies:</strong> {book.copyCount} total ({book.availableCopyCount} available, {book.borrowedCopyCount} borrowed)
+            </p>
             <p>
               <strong>Average Rating:</strong> {query.data.averageRating.toFixed(2)} / 5 ({query.data.ratingCount} ratings)
             </p>
           </div>
+
+          {book.activeLoans.length > 0 ? (
+            <div className="mt-4 rounded-xl border border-app-border bg-app-surface p-3">
+              <h3 className="font-heading text-base">Currently Borrowed By</h3>
+              <ul className="mt-2 space-y-2 text-sm">
+                {book.activeLoans.map((loan) => (
+                  <li key={loan.copyCode} className="rounded-lg border border-app-border bg-white p-2">
+                    <p>
+                      <strong>{loan.copyCode}</strong> - {loan.borrowerName || "Borrower"}
+                      {query.data.canViewPrivateContact
+                        ? loan.borrowerPhone
+                          ? ` (${loan.borrowerPhone})`
+                          : ""
+                        : loan.borrowerPhoneMasked
+                          ? ` (${loan.borrowerPhoneMasked})`
+                          : ""}
+                    </p>
+                    <p className="text-xs text-app-muted">
+                      Borrowed: {loan.borrowedAt ? formatDate(loan.borrowedAt) : "-"} | Expected Return:{" "}
+                      {loan.expectedReturnAt ? formatDate(loan.expectedReturnAt) : "-"}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           {book.summary ? (
             <div className="mt-4 rounded-xl border border-app-border bg-app-surface p-3">
@@ -131,10 +230,83 @@ export const PublicBookPage = () => {
       </article>
 
       <section className="rounded-3xl border border-app-border bg-white p-5 shadow-card">
+        <h3 className="font-heading text-xl">Request Borrow</h3>
+        <p className="mt-1 text-sm text-app-muted">Submit a borrow request. Admin or librarian will approve it.</p>
+
+        <form
+          className="mt-4 grid gap-3 md:grid-cols-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            requestMutation.mutate();
+          }}
+        >
+          <input
+            value={requestForm.requesterName}
+            onChange={(event) => setRequestForm((prev) => ({ ...prev, requesterName: event.target.value }))}
+            placeholder="Your name"
+            required
+            className="rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm"
+          />
+          <input
+            value={requestForm.requesterPhone}
+            onChange={(event) => setRequestForm((prev) => ({ ...prev, requesterPhone: event.target.value }))}
+            placeholder="Mobile number"
+            required
+            className="rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm"
+          />
+          <input
+            value={requestForm.requesterEmail}
+            onChange={(event) => setRequestForm((prev) => ({ ...prev, requesterEmail: event.target.value }))}
+            placeholder="Email (optional)"
+            className="rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm"
+          />
+          <input
+            type="date"
+            value={requestForm.expectedReturnAt}
+            onChange={(event) => setRequestForm((prev) => ({ ...prev, expectedReturnAt: event.target.value }))}
+            className="rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm"
+          />
+
+          <label className="text-sm">
+            Preferred Copy (optional)
+            <select
+              value={requestForm.requestedCopyId}
+              onChange={(event) => setRequestForm((prev) => ({ ...prev, requestedCopyId: event.target.value }))}
+              className="mt-1 w-full rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm"
+            >
+              <option value="">Any available copy</option>
+              {book.copies.map((copy) => (
+                <option key={copy.id} value={copy.id}>
+                  {copy.copyCode} ({copy.status})
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div />
+
+          <textarea
+            value={requestForm.note}
+            onChange={(event) => setRequestForm((prev) => ({ ...prev, note: event.target.value }))}
+            placeholder="Note (optional)"
+            className="min-h-24 rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm md:col-span-2"
+          />
+          <div className="md:col-span-2 flex items-center justify-between gap-3">
+            <p className="text-xs text-app-muted">{requestMessage}</p>
+            <button
+              type="submit"
+              disabled={requestMutation.isPending}
+              className="rounded-xl bg-app-primary px-4 py-2 text-sm font-medium text-white hover:bg-app-primary-strong disabled:opacity-60"
+            >
+              {requestMutation.isPending ? "Submitting..." : "Submit Borrow Request"}
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section className="rounded-3xl border border-app-border bg-white p-5 shadow-card">
         <h3 className="font-heading text-xl">Ratings and Comments</h3>
-        <p className="mt-1 text-sm text-app-muted">
-          Share your reading feedback with your name and phone number.
-        </p>
+        <p className="mt-1 text-sm text-app-muted">Share your reading feedback with your name and phone number.</p>
 
         <form
           className="mt-4 grid gap-3 md:grid-cols-2"
@@ -177,7 +349,7 @@ export const PublicBookPage = () => {
             onChange={(event) => setReviewForm((prev) => ({ ...prev, comment: event.target.value }))}
             placeholder="Write your comment..."
             required
-            className="md:col-span-2 min-h-24 rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm"
+            className="min-h-24 rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm md:col-span-2"
           />
           <div className="md:col-span-2 flex justify-end">
             <button
@@ -197,7 +369,11 @@ export const PublicBookPage = () => {
             query.data.reviews.map((review) => (
               <article key={review.id} className="rounded-xl border border-app-border bg-app-surface p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="font-medium text-sm">{review.reviewerName} ({review.reviewerPhone})</p>
+                  <p className="text-sm font-medium">
+                    {review.reviewerName} (
+                    {query.data.canViewPrivateContact ? review.reviewerPhone || review.reviewerPhoneMasked : review.reviewerPhoneMasked}
+                    )
+                  </p>
                   <p className="text-sm text-app-muted">
                     {"★".repeat(review.rating)}
                     {"☆".repeat(Math.max(0, 5 - review.rating))}

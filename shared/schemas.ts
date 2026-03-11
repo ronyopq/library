@@ -1,5 +1,12 @@
 import { z } from "zod";
-import { acquisitionTypes, bookStatuses, contributorRoles, loanStatuses, staffRoles } from "./constants";
+import {
+  acquisitionTypes,
+  bookStatuses,
+  contributorRoles,
+  loanRequestStatuses,
+  loanStatuses,
+  staffRoles
+} from "./constants";
 
 const optionalText = z
   .string()
@@ -79,6 +86,7 @@ export const bookPayloadSchema = z.object({
   isFavorite: z.boolean().default(false),
   status: z.enum(bookStatuses).default("available"),
   dateAdded: optionalText,
+  copyCount: z.number().int().min(1).max(50).optional(),
   contributors: z.array(contributorSchema).default([]),
   tags: z.array(z.string().trim().min(1).max(40)).default([]),
   acquisition: acquisitionSchema.optional(),
@@ -93,6 +101,7 @@ export const bookFilterSchema = z.object({
   status: optionalText,
   location: optionalText,
   includeArchived: z.boolean().optional(),
+  includeCopies: z.boolean().optional(),
   sort: z.enum(["recent", "title", "author", "publicationYear"]).optional(),
   limit: z.number().int().min(1).max(200).optional(),
   offset: z.number().int().min(0).optional()
@@ -117,12 +126,30 @@ export const ocrExtractSchema = z.object({
 
 export const loanCreateSchema = z.object({
   bookId: z.number().int().positive(),
+  bookCopyId: z.number().int().positive().optional(),
   borrowerName: z.string().trim().min(1).max(140),
   borrowerPhone: optionalText,
   borrowerEmail: z.string().email().optional(),
   borrowedAt: optionalText,
   expectedReturnAt: optionalText,
   note: z.string().trim().max(1000).optional(),
+  allowOverride: z.boolean().optional()
+});
+
+export const publicBorrowRequestCreateSchema = z.object({
+  requesterName: z.string().trim().min(2).max(140),
+  requesterPhone: z.string().trim().min(5).max(30),
+  requesterEmail: z.string().email().optional(),
+  expectedReturnAt: optionalText,
+  requestedCopyId: z.number().int().positive().optional(),
+  note: z.string().trim().max(1000).optional()
+});
+
+export const loanRequestDecisionSchema = z.object({
+  status: z.enum(loanRequestStatuses),
+  expectedReturnAt: optionalText,
+  requestedCopyId: z.number().int().positive().optional(),
+  adminNote: z.string().trim().max(1000).optional(),
   allowOverride: z.boolean().optional()
 });
 
@@ -178,6 +205,8 @@ export type DuplicateCheckInput = z.infer<typeof duplicateCheckSchema>;
 export type IsbnLookupInput = z.infer<typeof isbnLookupSchema>;
 export type OcrExtractInput = z.infer<typeof ocrExtractSchema>;
 export type LoanCreateInput = z.infer<typeof loanCreateSchema>;
+export type PublicBorrowRequestCreateInput = z.infer<typeof publicBorrowRequestCreateSchema>;
+export type LoanRequestDecisionInput = z.infer<typeof loanRequestDecisionSchema>;
 export type LoanReturnInput = z.infer<typeof loanReturnSchema>;
 export type SettingsInput = z.infer<typeof settingsSchema>;
 export type AcquisitionInput = z.infer<typeof acquisitionSchema>;

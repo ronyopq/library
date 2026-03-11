@@ -1,23 +1,40 @@
-import { and, asc, desc, eq, lt, sql } from "drizzle-orm";
+import { and, desc, eq, lt, sql } from "drizzle-orm";
 import type { LoanCreateInput, LoanReturnInput } from "@shared/schemas";
 import type { LoanRecord } from "@shared/types";
 import type { DbClient } from "../db/client";
-import { books, loans } from "../db/schema";
+import { bookCopies, books, loans } from "../db/schema";
 import { logActivity } from "./activityService";
+import {
+  getActiveLoanForCopy,
+  getAvailableCopyForBook,
+  getCopyById,
+  syncBookStatusFromCopies,
+  updateCopyStatus
+} from "./bookCopyService";
 
 export class LoanConflictError extends Error {}
 
-const mapLoanRow = (row: any): LoanRecord => {
+const maskPhone = (phone?: string | null): string | undefined => {
+  if (!phone) return undefined;
+  const trimmed = phone.trim();
+  if (trimmed.length <= 4) return "****";
+  return `${"*".repeat(Math.max(0, trimmed.length - 4))}${trimmed.slice(-4)}`;
+};
+
+const mapLoanRow = (row: any, includePrivatePhone = true): LoanRecord => {
   const isOverdue =
     row.status === "borrowed" && row.expectedReturnAt && new Date(row.expectedReturnAt).getTime() < Date.now();
 
   return {
     id: row.id,
     bookId: row.bookId,
+    bookCopyId: row.bookCopyId ?? undefined,
+    copyCode: row.copyCode ?? undefined,
     bookTitle: row.bookTitle ?? undefined,
     accessionCode: row.accessionCode ?? undefined,
     borrowerName: row.borrowerName,
-    borrowerPhone: row.borrowerPhone ?? undefined,
+    borrowerPhone: includePrivatePhone ? row.borrowerPhone ?? undefined : undefined,
+    borrowerPhoneMasked: maskPhone(row.borrowerPhone),
     borrowerEmail: row.borrowerEmail ?? undefined,
     borrowedAt: row.borrowedAt,
     expectedReturnAt: row.expectedReturnAt ?? undefined,
@@ -28,11 +45,45 @@ const mapLoanRow = (row: any): LoanRecord => {
   };
 };
 
+const findTargetCopy = async (
+  db: DbClient,
+  payload: LoanCreateInput
+): Promise<{
+  id: number;
+  bookId: number;
+  copyCode: string;
+}> => {
+  if (payload.bookCopyId) {
+    const copy = await getCopyById(db, payload.bookCopyId);
+    if (!copy || copy.bookId !== payload.bookId || copy.isArchived) {
+      throw new LoanConflictError("Selected copy is invalid for this book.");
+    }
+
+    return {
+      id: copy.id,
+      bookId: copy.bookId,
+      copyCode: copy.copyCode
+    };
+  }
+
+  const availableCopy = await getAvailableCopyForBook(db, payload.bookId);
+  if (!availableCopy) {
+    throw new LoanConflictError("No available copy found. Choose a copy and allow override if needed.");
+  }
+
+  return {
+    id: availableCopy.id,
+    bookId: availableCopy.bookId,
+    copyCode: availableCopy.copyCode
+  };
+};
+
 export const listLoans = async (db: DbClient): Promise<LoanRecord[]> => {
   const rows = await db
     .select({
       id: loans.id,
       bookId: loans.bookId,
+      bookCopyId: loans.bookCopyId,
       borrowerName: loans.borrowerName,
       borrowerPhone: loans.borrowerPhone,
       borrowerEmail: loans.borrowerEmail,
@@ -42,40 +93,44 @@ export const listLoans = async (db: DbClient): Promise<LoanRecord[]> => {
       status: loans.status,
       note: loans.note,
       bookTitle: books.title,
-      accessionCode: books.accessionCode
+      accessionCode: books.accessionCode,
+      copyCode: bookCopies.copyCode
     })
     .from(loans)
     .leftJoin(books, eq(loans.bookId, books.id))
+    .leftJoin(bookCopies, eq(loans.bookCopyId, bookCopies.id))
     .orderBy(desc(loans.borrowedAt), desc(loans.id));
 
-  return rows.map(mapLoanRow);
+  return rows.map((row) => mapLoanRow(row, true));
 };
 
-export const createLoan = async (db: DbClient, payload: LoanCreateInput): Promise<LoanRecord> => {
+export const createLoan = async (
+  db: DbClient,
+  payload: LoanCreateInput,
+  options?: {
+    source?: string;
+  }
+): Promise<LoanRecord> => {
   const now = new Date().toISOString();
+  const targetCopy = await findTargetCopy(db, payload);
 
-  const activeLoanRows = await db
-    .select({
-      id: loans.id
-    })
-    .from(loans)
-    .where(and(eq(loans.bookId, payload.bookId), eq(loans.status, "borrowed")))
-    .limit(1);
-
-  if (activeLoanRows.length > 0 && !payload.allowOverride) {
-    throw new LoanConflictError("This book is already borrowed. Set override to continue.");
+  const activeLoan = await getActiveLoanForCopy(db, targetCopy.id);
+  if (activeLoan && !payload.allowOverride) {
+    throw new LoanConflictError("Selected copy is already borrowed. Set override to continue.");
   }
 
   const inserted = await db
     .insert(loans)
     .values({
       bookId: payload.bookId,
+      bookCopyId: targetCopy.id,
       borrowerName: payload.borrowerName,
       borrowerPhone: payload.borrowerPhone,
       borrowerEmail: payload.borrowerEmail,
       borrowedAt: payload.borrowedAt ?? now,
       expectedReturnAt: payload.expectedReturnAt,
       status: "borrowed",
+      source: options?.source ?? "admin",
       note: payload.note,
       overrideDoubleLend: payload.allowOverride ?? false,
       createdAt: now,
@@ -85,22 +140,19 @@ export const createLoan = async (db: DbClient, payload: LoanCreateInput): Promis
       id: loans.id
     });
 
-  await db
-    .update(books)
-    .set({
-      status: "borrowed",
-      updatedAt: now
-    })
-    .where(eq(books.id, payload.bookId));
+  await updateCopyStatus(db, targetCopy.id, "borrowed");
+  await syncBookStatusFromCopies(db, payload.bookId);
 
   await logActivity(db, {
     entityType: "loan",
     entityId: `${inserted[0].id}`,
     action: "loan_created",
-    message: `Loan created for book ${payload.bookId}`,
+    message: `Loan created for copy ${targetCopy.copyCode}`,
     payload: {
       borrowerName: payload.borrowerName,
-      expectedReturnAt: payload.expectedReturnAt
+      copyCode: targetCopy.copyCode,
+      expectedReturnAt: payload.expectedReturnAt,
+      source: options?.source ?? "admin"
     }
   });
 
@@ -108,6 +160,7 @@ export const createLoan = async (db: DbClient, payload: LoanCreateInput): Promis
     .select({
       id: loans.id,
       bookId: loans.bookId,
+      bookCopyId: loans.bookCopyId,
       borrowerName: loans.borrowerName,
       borrowerPhone: loans.borrowerPhone,
       borrowerEmail: loans.borrowerEmail,
@@ -117,14 +170,16 @@ export const createLoan = async (db: DbClient, payload: LoanCreateInput): Promis
       status: loans.status,
       note: loans.note,
       bookTitle: books.title,
-      accessionCode: books.accessionCode
+      accessionCode: books.accessionCode,
+      copyCode: bookCopies.copyCode
     })
     .from(loans)
     .leftJoin(books, eq(loans.bookId, books.id))
+    .leftJoin(bookCopies, eq(loans.bookCopyId, bookCopies.id))
     .where(eq(loans.id, inserted[0].id))
     .limit(1);
 
-  return mapLoanRow(rows[0]);
+  return mapLoanRow(rows[0], true);
 };
 
 export const returnLoan = async (db: DbClient, loanId: number, payload: LoanReturnInput): Promise<LoanRecord | null> => {
@@ -149,30 +204,10 @@ export const returnLoan = async (db: DbClient, loanId: number, payload: LoanRetu
     })
     .where(eq(loans.id, loanId));
 
-  if (payload.markLost) {
-    await db
-      .update(books)
-      .set({
-        status: "lost",
-        updatedAt: now
-      })
-      .where(eq(books.id, loan.bookId));
-  } else {
-    const outstanding = await db
-      .select({ count: sql<number>`COUNT(*)` })
-      .from(loans)
-      .where(and(eq(loans.bookId, loan.bookId), eq(loans.status, "borrowed")));
-
-    if (Number(outstanding[0]?.count ?? 0) === 0) {
-      await db
-        .update(books)
-        .set({
-          status: "available",
-          updatedAt: now
-        })
-        .where(eq(books.id, loan.bookId));
-    }
+  if (loan.bookCopyId) {
+    await updateCopyStatus(db, loan.bookCopyId, payload.markLost ? "lost" : "available");
   }
+  await syncBookStatusFromCopies(db, loan.bookId);
 
   await logActivity(db, {
     entityType: "loan",
@@ -188,6 +223,7 @@ export const returnLoan = async (db: DbClient, loanId: number, payload: LoanRetu
     .select({
       id: loans.id,
       bookId: loans.bookId,
+      bookCopyId: loans.bookCopyId,
       borrowerName: loans.borrowerName,
       borrowerPhone: loans.borrowerPhone,
       borrowerEmail: loans.borrowerEmail,
@@ -197,14 +233,16 @@ export const returnLoan = async (db: DbClient, loanId: number, payload: LoanRetu
       status: loans.status,
       note: loans.note,
       bookTitle: books.title,
-      accessionCode: books.accessionCode
+      accessionCode: books.accessionCode,
+      copyCode: bookCopies.copyCode
     })
     .from(loans)
     .leftJoin(books, eq(loans.bookId, books.id))
+    .leftJoin(bookCopies, eq(loans.bookCopyId, bookCopies.id))
     .where(eq(loans.id, loanId))
     .limit(1);
 
-  return rows[0] ? mapLoanRow(rows[0]) : null;
+  return rows[0] ? mapLoanRow(rows[0], true) : null;
 };
 
 export const countOverdueLoans = async (db: DbClient): Promise<number> => {

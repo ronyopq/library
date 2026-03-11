@@ -33,10 +33,15 @@ body {
     gap: 2mm !important;
   }
 
-  .label-item {
-    border: 1px solid #000 !important;
-    box-shadow: none !important;
-  }
+.label-item {
+  border: 1px solid #000 !important;
+  box-shadow: none !important;
+}
+
+.label-item svg {
+  max-width: 100% !important;
+  height: auto !important;
+}
 
   body {
     background: #fff !important;

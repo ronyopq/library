@@ -11,6 +11,13 @@ export interface BookReviewSummary {
   reviews: BookReview[];
 }
 
+const maskPhone = (phone?: string | null): string | undefined => {
+  if (!phone) return undefined;
+  const trimmed = phone.trim();
+  if (trimmed.length <= 4) return "****";
+  return `${"*".repeat(Math.max(0, trimmed.length - 4))}${trimmed.slice(-4)}`;
+};
+
 const mapReview = (row: {
   id: number;
   bookId: number;
@@ -19,17 +26,22 @@ const mapReview = (row: {
   rating: number;
   comment: string;
   createdAt: string;
-}): BookReview => ({
+}, includePrivatePhone: boolean): BookReview => ({
   id: row.id,
   bookId: row.bookId,
   reviewerName: row.reviewerName,
-  reviewerPhone: row.reviewerPhone,
+  reviewerPhone: includePrivatePhone ? row.reviewerPhone : undefined,
+  reviewerPhoneMasked: maskPhone(row.reviewerPhone),
   rating: row.rating,
   comment: row.comment,
   createdAt: row.createdAt
 });
 
-export const getBookReviewSummary = async (db: DbClient, bookId: number): Promise<BookReviewSummary> => {
+export const getBookReviewSummary = async (
+  db: DbClient,
+  bookId: number,
+  includePrivatePhone = true
+): Promise<BookReviewSummary> => {
   const [aggregateRows, reviewRows] = await Promise.all([
     db
       .select({
@@ -60,7 +72,7 @@ export const getBookReviewSummary = async (db: DbClient, bookId: number): Promis
   return {
     averageRating: Number.isFinite(avg) ? avg : 0,
     ratingCount: count,
-    reviews: reviewRows.map(mapReview)
+    reviews: reviewRows.map((row) => mapReview(row, includePrivatePhone))
   };
 };
 
@@ -112,14 +124,20 @@ export const addPublicReview = async (
     }
   });
 
-  return getBookReviewSummary(db, target.id);
+  return getBookReviewSummary(db, target.id, false);
 };
 
-export const getPublicReviewSummaryByCode = async (db: DbClient, shortCode: string): Promise<BookReviewSummary | null> => {
+export const getPublicReviewSummaryByCode = async (
+  db: DbClient,
+  shortCode: string,
+  options?: {
+    includePrivatePhone?: boolean;
+  }
+): Promise<BookReviewSummary | null> => {
   const target = await resolvePublicBook(db, shortCode);
   if (!target || target.isArchived || !target.isPublic) {
     return null;
   }
 
-  return getBookReviewSummary(db, target.id);
+  return getBookReviewSummary(db, target.id, Boolean(options?.includePrivatePhone));
 };

@@ -201,6 +201,7 @@ export const loans = sqliteTable(
     bookId: integer("book_id")
       .notNull()
       .references(() => books.id, { onDelete: "cascade" }),
+    bookCopyId: integer("book_copy_id"),
     borrowerName: text("borrower_name").notNull(),
     borrowerPhone: text("borrower_phone"),
     borrowerEmail: text("borrower_email"),
@@ -208,14 +209,68 @@ export const loans = sqliteTable(
     expectedReturnAt: text("expected_return_at"),
     returnedAt: text("returned_at"),
     status: text("status").notNull().default("borrowed"),
+    source: text("source").notNull().default("admin"),
     note: text("note"),
     overrideDoubleLend: integer("override_double_lend", { mode: "boolean" }).notNull().default(false),
     ...timestampColumns
   },
   (table) => ({
     bookIdx: index("idx_loans_book").on(table.bookId),
+    copyIdx: index("idx_loans_copy").on(table.bookCopyId),
     statusIdx: index("idx_loans_status").on(table.status),
     expectedIdx: index("idx_loans_expected_return").on(table.expectedReturnAt)
+  })
+);
+
+export const bookCopies = sqliteTable(
+  "book_copies",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    bookId: integer("book_id")
+      .notNull()
+      .references(() => books.id, { onDelete: "cascade" }),
+    copyNumber: integer("copy_number").notNull(),
+    copyCode: text("copy_code").notNull().unique(),
+    barcodeValue: text("barcode_value").notNull(),
+    status: text("status").notNull().default("available"),
+    isArchived: integer("is_archived", { mode: "boolean" }).notNull().default(false),
+    note: text("note"),
+    ...timestampColumns
+  },
+  (table) => ({
+    bookIdx: index("idx_book_copies_book").on(table.bookId),
+    copyCodeIdx: index("idx_book_copies_code").on(table.copyCode),
+    statusIdx: index("idx_book_copies_status").on(table.status),
+    uniqueBookCopyNumberIdx: uniqueIndex("idx_book_copies_book_copy_number").on(table.bookId, table.copyNumber)
+  })
+);
+
+export const loanRequests = sqliteTable(
+  "loan_requests",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    bookId: integer("book_id")
+      .notNull()
+      .references(() => books.id, { onDelete: "cascade" }),
+    requestedCopyId: integer("requested_copy_id").references(() => bookCopies.id, { onDelete: "set null" }),
+    requesterName: text("requester_name").notNull(),
+    requesterPhone: text("requester_phone").notNull(),
+    requesterEmail: text("requester_email"),
+    expectedReturnAt: text("expected_return_at"),
+    note: text("note"),
+    adminNote: text("admin_note"),
+    requestedAt: text("requested_at").notNull().default("CURRENT_TIMESTAMP"),
+    reviewedAt: text("reviewed_at"),
+    reviewedByUserId: integer("reviewed_by_user_id"),
+    approvedLoanId: integer("approved_loan_id"),
+    status: text("status").notNull().default("requested"),
+    ...timestampColumns
+  },
+  (table) => ({
+    bookIdx: index("idx_loan_requests_book").on(table.bookId),
+    statusIdx: index("idx_loan_requests_status").on(table.status),
+    requestedAtIdx: index("idx_loan_requests_requested_at").on(table.requestedAt),
+    reviewedByIdx: index("idx_loan_requests_reviewed_by").on(table.reviewedByUserId)
   })
 );
 

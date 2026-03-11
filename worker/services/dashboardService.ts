@@ -1,7 +1,7 @@
 import { and, desc, eq, lt, sql } from "drizzle-orm";
 import type { DashboardStats } from "@shared/types";
 import type { DbClient } from "../db/client";
-import { activityLogs, bookPeople, books, categories, languages, loans, people } from "../db/schema";
+import { activityLogs, bookCopies, bookPeople, books, categories, languages, loans, people } from "../db/schema";
 import { listBooks } from "./bookService";
 import { listLoans } from "./loanService";
 
@@ -28,7 +28,11 @@ export const getDashboardStats = async (db: DbClient): Promise<DashboardStats> =
       .innerJoin(books, eq(bookPeople.bookId, books.id))
       .where(and(eq(bookPeople.role, "author"), eq(books.isArchived, false))),
     db.select({ count: sql<number>`COUNT(DISTINCT ${books.languageId})` }).from(books).where(and(eq(books.isArchived, false), sql`${books.languageId} IS NOT NULL`)),
-    db.select({ count: sql<number>`COUNT(*)` }).from(books).where(and(eq(books.status, "borrowed"), eq(books.isArchived, false))),
+    db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(bookCopies)
+      .innerJoin(books, eq(bookCopies.bookId, books.id))
+      .where(and(eq(bookCopies.status, "borrowed"), eq(bookCopies.isArchived, false), eq(books.isArchived, false))),
     db.select({ count: sql<number>`COUNT(*)` }).from(loans).where(and(eq(loans.status, "borrowed"), lt(loans.expectedReturnAt, now))),
     db.select({ count: sql<number>`COUNT(*)` }).from(books).where(eq(books.isArchived, true)),
     db

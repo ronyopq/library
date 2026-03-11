@@ -1,6 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import type { DbClient } from "../db/client";
-import { books, loans } from "../db/schema";
+import { bookCopies, books, loans } from "../db/schema";
 
 const csvEscape = (value: unknown): string => {
   const text = `${value ?? ""}`;
@@ -65,6 +65,7 @@ export const exportLoansCsv = async (db: DbClient): Promise<string> => {
     .select({
       id: loans.id,
       accessionCode: sql<string>`COALESCE((SELECT accession_code FROM books WHERE id = ${loans.bookId}), '')`,
+      copyCode: sql<string>`COALESCE((SELECT copy_code FROM book_copies WHERE id = ${loans.bookCopyId}), '')`,
       bookTitle: sql<string>`COALESCE((SELECT title FROM books WHERE id = ${loans.bookId}), '')`,
       borrowerName: loans.borrowerName,
       borrowerPhone: loans.borrowerPhone,
@@ -81,6 +82,7 @@ export const exportLoansCsv = async (db: DbClient): Promise<string> => {
     [
       "id",
       "accessionCode",
+      "copyCode",
       "bookTitle",
       "borrowerName",
       "borrowerPhone",

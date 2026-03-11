@@ -8,10 +8,12 @@ import {
   createStaffUserSchema,
   duplicateCheckSchema,
   isbnLookupSchema,
+  loanRequestDecisionSchema,
   loginSchema,
   loanCreateSchema,
   loanReturnSchema,
   ocrExtractSchema,
+  publicBorrowRequestCreateSchema,
   publicReviewCreateSchema,
   settingsSchema
 } from "@shared/schemas";
@@ -38,6 +40,7 @@ import { exportBooksCsv, exportLoansCsv } from "../services/exportService";
 import { storeCoverImage } from "../services/imageService";
 import { lookupIsbn } from "../services/isbnService";
 import { createLoan, listLoans, LoanConflictError, returnLoan } from "../services/loanService";
+import { createPublicLoanRequest, decideLoanRequest, listLoanRequests } from "../services/loanRequestService";
 import { extractMetadataFromImage } from "../services/ocrService";
 import { addPublicReview, getPublicReviewSummaryByCode } from "../services/reviewService";
 import { getSettings, updateSettings } from "../services/settingsService";
@@ -96,15 +99,23 @@ apiRouter.get("/public/books", async (c) => {
 apiRouter.get("/public/books/:shortCode", async (c) => {
   const db = getDb(c.env);
   const shortCode = c.req.param("shortCode");
-  const book = await getPublicBookByCode(db, shortCode);
+  const authUser = await resolveAuthUser(db, c.env, c.req.raw, c.req.query("token"));
+  const canViewPrivateContact = Boolean(authUser);
+
+  const book = await getPublicBookByCode(db, shortCode, {
+    includePrivatePhone: canViewPrivateContact
+  });
   if (!book) {
     return notFound(c, "Public book not found");
   }
 
-  const reviews = await getPublicReviewSummaryByCode(db, shortCode);
+  const reviews = await getPublicReviewSummaryByCode(db, shortCode, {
+    includePrivatePhone: canViewPrivateContact
+  });
 
   return c.json({
     book,
+    canViewPrivateContact,
     averageRating: reviews?.averageRating ?? 0,
     ratingCount: reviews?.ratingCount ?? 0,
     reviews: reviews?.reviews ?? []
@@ -119,13 +130,36 @@ apiRouter.get("/public/summary", async (c) => {
 
 apiRouter.get("/public/books/:shortCode/reviews", async (c) => {
   const db = getDb(c.env);
-  const summary = await getPublicReviewSummaryByCode(db, c.req.param("shortCode"));
+  const authUser = await resolveAuthUser(db, c.env, c.req.raw, c.req.query("token"));
+  const summary = await getPublicReviewSummaryByCode(db, c.req.param("shortCode"), {
+    includePrivatePhone: Boolean(authUser)
+  });
   if (!summary) {
     return notFound(c, "Public book not found");
   }
 
   return c.json(summary);
 });
+
+apiRouter.post(
+  "/public/books/:shortCode/borrow-requests",
+  zValidator("json", publicBorrowRequestCreateSchema),
+  async (c) => {
+    const db = getDb(c.env);
+    const payload = c.req.valid("json");
+
+    try {
+      const request = await createPublicLoanRequest(db, c.req.param("shortCode"), payload);
+      if (!request) {
+        return notFound(c, "Public book not found");
+      }
+
+      return c.json({ request }, 201);
+    } catch (error) {
+      return badRequest(c, error instanceof Error ? error.message : "Could not create borrow request");
+    }
+  }
+);
 
 apiRouter.post("/public/books/:shortCode/reviews", zValidator("json", publicReviewCreateSchema), async (c) => {
   const db = getDb(c.env);
@@ -173,6 +207,7 @@ apiRouter.use("/ocr/*", requireStaff);
 apiRouter.use("/images/*", requireStaff);
 apiRouter.use("/dashboard", requireStaff);
 apiRouter.use("/loans*", requireStaff);
+apiRouter.use("/loan-requests*", requireStaff);
 apiRouter.use("/settings*", requireStaff);
 apiRouter.use("/activity", requireStaff);
 apiRouter.use("/options", requireStaff);
@@ -207,6 +242,7 @@ apiRouter.get("/books", async (c) => {
     status: c.req.query("status"),
     location: c.req.query("location"),
     includeArchived: c.req.query("includeArchived") === "1",
+    includeCopies: c.req.query("includeCopies") === "1",
     sort: c.req.query("sort") ?? "recent",
     limit: c.req.query("limit") ? Number(c.req.query("limit")) : 40,
     offset: c.req.query("offset") ? Number(c.req.query("offset")) : 0
@@ -361,6 +397,17 @@ apiRouter.get("/loans", async (c) => {
   return c.json({ loans: data });
 });
 
+apiRouter.get("/loan-requests", async (c) => {
+  const db = getDb(c.env);
+  const requests = await listLoanRequests(db, {
+    status: c.req.query("status") ?? undefined,
+    includePrivatePhone: true,
+    limit: c.req.query("limit") ? Number(c.req.query("limit")) : 120
+  });
+
+  return c.json({ requests });
+});
+
 apiRouter.post("/loans", zValidator("json", loanCreateSchema), async (c) => {
   const payload = c.req.valid("json");
   const db = getDb(c.env);
@@ -388,6 +435,33 @@ apiRouter.post("/loans/:id/return", zValidator("json", loanReturnSchema), async 
   if (!loan) return notFound(c, "Loan not found");
 
   return c.json({ loan });
+});
+
+apiRouter.post("/loan-requests/:id/decision", zValidator("json", loanRequestDecisionSchema), async (c) => {
+  const id = parseBookId(c.req.param("id"));
+  if (!id) return badRequest(c, "Invalid loan request id");
+
+  const payload = c.req.valid("json");
+  const db = getDb(c.env);
+
+  if (payload.status !== "approved" && payload.status !== "rejected" && payload.status !== "cancelled") {
+    return badRequest(c, "Invalid decision status");
+  }
+
+  try {
+    const request = await decideLoanRequest(db, id, payload, c.get("authUser"));
+    if (!request) {
+      return notFound(c, "Loan request not found");
+    }
+
+    return c.json({ request });
+  } catch (error) {
+    if (error instanceof LoanConflictError) {
+      return conflict(c, error.message);
+    }
+
+    return badRequest(c, error instanceof Error ? error.message : "Could not process request");
+  }
 });
 
 apiRouter.get("/settings", async (c) => {

@@ -29,6 +29,7 @@ interface FormValues {
   series: string;
   volume: string;
   pageCount: string;
+  copyCount: string;
   format: string;
   condition: string;
   room: string;
@@ -80,6 +81,7 @@ const defaultValues: FormValues = {
   series: "",
   volume: "",
   pageCount: "",
+  copyCount: "1",
   format: "",
   condition: "",
   room: "",
@@ -147,6 +149,7 @@ const mapInitialToForm = (initialData?: any): FormValues => {
     series: initialData.series ?? "",
     volume: initialData.volume ?? "",
     pageCount: initialData.pageCount?.toString() ?? "",
+    copyCount: initialData.copyCount?.toString() ?? "1",
     format: initialData.format ?? "",
     condition: initialData.condition ?? "",
     room: initialData.room ?? "",
@@ -237,6 +240,7 @@ export const BookForm = ({ bookId, initialData, draftKey, onSaved }: BookFormPro
       series: data.series || undefined,
       volume: data.volume || undefined,
       pageCount: data.pageCount ? Number(data.pageCount) : undefined,
+      copyCount: data.copyCount ? Number(data.copyCount) : undefined,
       format: data.format || undefined,
       condition: data.condition || undefined,
       room: data.room || undefined,
@@ -465,6 +469,7 @@ export const BookForm = ({ bookId, initialData, draftKey, onSaved }: BookFormPro
           <input {...form.register("languageName")} placeholder="Language" className={inputClass} />
           <input {...form.register("publicationYear")} placeholder="Publication Year" className={inputClass} />
           <input {...form.register("pageCount")} placeholder="Page Count" className={inputClass} />
+          <input {...form.register("copyCount")} placeholder="Number of Copies" className={inputClass} />
           <input {...form.register("edition")} placeholder="Edition" className={inputClass} />
           <input {...form.register("printingNumber")} placeholder="Printing Number" className={inputClass} />
           <input {...form.register("series")} placeholder="Series" className={inputClass} />

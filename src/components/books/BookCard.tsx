@@ -50,6 +50,9 @@ export const BookCard = ({ book, onArchive, onRestore, onDelete }: BookCardProps
               {book.room || ""} {book.cabinet ? `/ ${book.cabinet}` : ""} {book.rack ? `/ ${book.rack}` : ""}{" "}
               {book.shelf ? `/ ${book.shelf}` : ""}
             </p>
+            <p>
+              Copies: {book.copyCount} ({book.availableCopyCount} available, {book.borrowedCopyCount} borrowed)
+            </p>
             <p>Added: {formatDate(book.dateAdded)}</p>
           </div>
         </div>

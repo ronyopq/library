@@ -33,7 +33,10 @@ const escapeHtml = (value?: string | null): string =>
 app.get("/b/:shortId", async (c) => {
   const shortId = c.req.param("shortId");
   const db = getDb(c.env);
-  const [book, settings] = await Promise.all([getPublicBookByCode(db, shortId), getSettings(db)]);
+  const [book, settings] = await Promise.all([
+    getPublicBookByCode(db, shortId, { includePrivatePhone: false }),
+    getSettings(db)
+  ]);
 
   if (!book) {
     return c.html(
@@ -51,6 +54,18 @@ app.get("/b/:shortId", async (c) => {
   const dateAdded = new Date(book.dateAdded).toLocaleDateString("en-US");
   const location = escapeHtml([book.room, book.cabinet, book.rack, book.shelf, book.positionNote].filter(Boolean).join(" / "));
   const notes = escapeHtml(book.publicNotes ?? book.summary ?? "");
+  const copySummary = `${book.copyCount} copies (${book.availableCopyCount} available, ${book.borrowedCopyCount} borrowed)`;
+  const activeLoansHtml = book.activeLoans.length
+    ? `<div class="borrowed"><h3>Currently Borrowed</h3><ul>${book.activeLoans
+        .map(
+          (loan) => `<li><strong>${escapeHtml(loan.copyCode)}</strong> - ${escapeHtml(loan.borrowerName ?? "Borrower")} (${
+            escapeHtml(loan.borrowerPhoneMasked ?? "hidden")
+          })${loan.borrowedAt ? ` | Borrowed: ${escapeHtml(new Date(loan.borrowedAt).toLocaleDateString("en-US"))}` : ""}${
+            loan.expectedReturnAt ? ` | Due: ${escapeHtml(new Date(loan.expectedReturnAt).toLocaleDateString("en-US"))}` : ""
+          }</li>`
+        )
+        .join("")}</ul></div>`
+    : "";
   const coverUrl = book.coverImageKey
     ? /^https?:\/\//i.test(book.coverImageKey)
       ? book.coverImageKey
@@ -139,6 +154,25 @@ app.get("/b/:shortId", async (c) => {
       border: 1px solid #e2e8fb;
       white-space: pre-wrap;
     }
+    .borrowed {
+      margin: 0 24px 16px;
+      padding: 12px 14px;
+      background: #f7f9ff;
+      border: 1px solid #dfe7fb;
+      border-radius: 10px;
+    }
+    .borrowed h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+    }
+    .borrowed ul {
+      margin: 0;
+      padding: 0 0 0 18px;
+      color: #3c4a70;
+      font-size: 14px;
+      display: grid;
+      gap: 6px;
+    }
     @media (max-width: 680px) {
       .content {
         grid-template-columns: 1fr;
@@ -165,10 +199,12 @@ app.get("/b/:shortId", async (c) => {
         ${category ? `<div><strong>Category:</strong> ${category}</div>` : ""}
         ${language ? `<div><strong>Language:</strong> ${language}</div>` : ""}
         ${location ? `<div><strong>Shelf:</strong> ${location}</div>` : ""}
+        <div><strong>Copies:</strong> ${escapeHtml(copySummary)}</div>
         <div><strong>Added On:</strong> ${escapeHtml(dateAdded)}</div>
         <div class="code">Public Code: ${escapeHtml(book.publicCode)} | Accession: ${escapeHtml(book.accessionCode)}</div>
       </div>
     </section>
+    ${activeLoansHtml}
     ${notes ? `<section class="notes">${notes}</section>` : ""}
   </article>
 </body>

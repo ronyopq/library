@@ -1,14 +1,31 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { LabelPreview } from "@/components/labels/LabelPreview";
+import { LabelPreview, type LabelItem } from "@/components/labels/LabelPreview";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
 import { LoadingState } from "@/components/common/LoadingState";
 import { apiRequest, downloadFile } from "@/lib/api";
 
+interface BookCopyItem {
+  id: number;
+  copyCode: string;
+  barcodeValue: string;
+  status: string;
+}
+
+interface LabelBook {
+  id: number;
+  title?: string;
+  authors: string[];
+  accessionCode: string;
+  publicCode: string;
+  dateAdded: string;
+  copies?: BookCopyItem[];
+}
+
 export const PrintLabelsPage = () => {
   const [search, setSearch] = useState("");
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [overrideOptions, setOverrideOptions] = useState<
     Partial<{
       labelIncludeTitle: boolean;
@@ -22,8 +39,11 @@ export const PrintLabelsPage = () => {
   >({});
 
   const booksQuery = useQuery({
-    queryKey: ["books", "labels"],
-    queryFn: () => apiRequest<{ items: any[] }>("/api/books", { params: { includeArchived: 0, limit: 400, sort: "title" } })
+    queryKey: ["books", "labels", "copy-aware"],
+    queryFn: () =>
+      apiRequest<{ items: LabelBook[] }>("/api/books", {
+        params: { includeArchived: 0, includeCopies: 1, limit: 400, sort: "title" }
+      })
   });
 
   const settingsQuery = useQuery({
@@ -49,20 +69,53 @@ export const PrintLabelsPage = () => {
     labelHeightMm: overrideOptions.labelHeightMm ?? settings.labelHeightMm
   };
 
+  const allLabelItems = useMemo<LabelItem[]>(
+    () =>
+      books.flatMap((book) => {
+        const copies = book.copies ?? [];
+        if (copies.length === 0) {
+          const fallbackCopyCode = `${book.accessionCode}-C01`;
+          return [
+            {
+              id: `${book.id}-fallback`,
+              bookId: book.id,
+              accessionCode: book.accessionCode,
+              publicCode: book.publicCode,
+              title: book.title,
+              authors: book.authors ?? [],
+              dateAdded: book.dateAdded,
+              copyCode: fallbackCopyCode,
+              barcodeValue: fallbackCopyCode
+            }
+          ];
+        }
+
+        return copies.map((copy) => ({
+          id: `${book.id}-${copy.id}`,
+          bookId: book.id,
+          accessionCode: book.accessionCode,
+          publicCode: book.publicCode,
+          title: book.title,
+          authors: book.authors ?? [],
+          dateAdded: book.dateAdded,
+          copyCode: copy.copyCode,
+          barcodeValue: copy.barcodeValue || copy.copyCode
+        }));
+      }),
+    [books]
+  );
+
   const filtered = useMemo(() => {
     const keyword = search.toLowerCase().trim();
-    if (!keyword) return books;
-    return books.filter((book) =>
-      [book.title, book.accessionCode, book.publicCode, ...(book.authors ?? [])]
-        .join(" ")
-        .toLowerCase()
-        .includes(keyword)
+    if (!keyword) return allLabelItems;
+    return allLabelItems.filter((item) =>
+      [item.title, item.accessionCode, item.publicCode, item.copyCode, ...item.authors].join(" ").toLowerCase().includes(keyword)
     );
-  }, [books, search]);
+  }, [allLabelItems, search]);
 
-  const selectedBooks = books.filter((book) => selectedIds.includes(book.id));
+  const selectedItems = allLabelItems.filter((item) => selectedIds.includes(item.id));
 
-  const toggle = (id: number) => {
+  const toggle = (id: string) => {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
   };
 
@@ -70,7 +123,7 @@ export const PrintLabelsPage = () => {
     <div className="space-y-4">
       <header className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
         <h2 className="font-heading text-xl">Print Barcodes and Labels</h2>
-        <p className="text-sm text-app-muted">Generate printable label sheets for selected books.</p>
+        <p className="text-sm text-app-muted">Generate printable label sheets for selected book copies.</p>
       </header>
 
       <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
@@ -78,11 +131,11 @@ export const PrintLabelsPage = () => {
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search title, accession, author"
+            placeholder="Search title, accession, copy code, author"
             className="rounded-xl border border-app-border px-3 py-2 text-sm"
           />
           <button type="button" onClick={() => window.print()} className="rounded-lg bg-app-primary px-4 py-2 text-sm font-medium text-white">
-            Print ({selectedBooks.length})
+            Print ({selectedItems.length})
           </button>
           <div className="flex gap-2">
             <button type="button" onClick={() => downloadFile("/api/export/books.csv")} className="rounded-lg border border-app-border px-3 py-2 text-sm">
@@ -136,19 +189,21 @@ export const PrintLabelsPage = () => {
       </section>
 
       <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card print:hidden">
-        <h3 className="font-heading text-base">Select Books</h3>
+        <h3 className="font-heading text-base">Select Book Copies</h3>
         {filtered.length === 0 ? (
-          <EmptyState title="No books" />
+          <EmptyState title="No copies found" />
         ) : (
           <ul className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-            {filtered.map((book) => (
-              <li key={book.id} className="rounded-lg border border-app-border p-2 text-sm">
+            {filtered.map((item) => (
+              <li key={item.id} className="rounded-lg border border-app-border p-2 text-sm">
                 <label className="flex cursor-pointer items-start gap-2">
-                  <input type="checkbox" checked={selectedIds.includes(book.id)} onChange={() => toggle(book.id)} className="mt-1" />
+                  <input type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => toggle(item.id)} className="mt-1" />
                   <span>
-                    <strong>{book.title || "Untitled"}</strong>
+                    <strong>{item.title || "Untitled"}</strong>
                     <br />
-                    <span className="text-xs text-app-muted">{book.accessionCode} - {book.authors?.join(", ")}</span>
+                    <span className="text-xs text-app-muted">
+                      {item.copyCode} - {item.authors?.join(", ")}
+                    </span>
                   </span>
                 </label>
               </li>
@@ -163,14 +218,14 @@ export const PrintLabelsPage = () => {
           gridTemplateColumns: `repeat(${displaySettings.labelColumns}, minmax(0, 1fr))`
         }}
       >
-        {selectedBooks.map((book) => (
+        {selectedItems.map((item) => (
           <div
-            key={book.id}
+            key={item.id}
             className="print:break-inside-avoid"
             style={{ minHeight: `${displaySettings.labelHeightMm}mm`, minWidth: `${displaySettings.labelWidthMm}mm` }}
           >
             <LabelPreview
-              book={book}
+              item={item}
               libraryName={settings.libraryName}
               publicBaseUrl={settings.publicBaseUrl}
               includeTitle={displaySettings.labelIncludeTitle}

@@ -9,11 +9,11 @@ import {
   bookTags,
   categories,
   languages,
-  loans,
   people,
   publishers,
   tags
 } from "../db/schema";
+import { createBookCopies, getCopyCountsForBookIds, listBookCopies, syncBookStatusFromCopies } from "./bookCopyService";
 import { logActivity } from "./activityService";
 import { generateCodes } from "./codeService";
 import { clearBookRelations, ensureCategoryId, ensureLanguageId, ensurePersonId, ensurePublisherId, ensureTagId } from "./referenceService";
@@ -33,10 +33,20 @@ const splitCommaList = (value?: string | null): string[] => {
     .filter(Boolean);
 };
 
-const mapListRow = (row: any): BookListItem => ({
+const mapListRow = (
+  row: any,
+  copyInfo?: {
+    copyCount: number;
+    availableCopyCount: number;
+    borrowedCopyCount: number;
+    lostCopyCount: number;
+    primaryCopyCode?: string;
+  }
+): BookListItem => ({
   id: row.id,
   accessionCode: row.accessionCode,
   publicCode: row.publicCode,
+  primaryCopyCode: copyInfo?.primaryCopyCode,
   title: row.title ?? undefined,
   subtitle: row.subtitle ?? undefined,
   authors: splitCommaList(row.authors),
@@ -52,6 +62,10 @@ const mapListRow = (row: any): BookListItem => ({
   rack: row.rack ?? undefined,
   shelf: row.shelf ?? undefined,
   positionNote: row.positionNote ?? undefined,
+  copyCount: copyInfo?.copyCount ?? 1,
+  availableCopyCount: copyInfo?.availableCopyCount ?? (row.status === "available" ? 1 : 0),
+  borrowedCopyCount: copyInfo?.borrowedCopyCount ?? (row.status === "borrowed" ? 1 : 0),
+  lostCopyCount: copyInfo?.lostCopyCount ?? (row.status === "lost" ? 1 : 0),
   dateAdded: row.dateAdded
 });
 
@@ -249,8 +263,28 @@ export const listBooks = async (db: DbClient, filters: BookFilterInput): Promise
     .from(books)
     .where(whereClause);
 
+  const bookIds = rows.map((row) => row.id);
+  const copyMap = await getCopyCountsForBookIds(db, bookIds);
+  const copiesByBookId = new Map<number, Awaited<ReturnType<typeof listBookCopies>>>();
+
+  if (filters.includeCopies) {
+    const copyGroups = await Promise.all(
+      bookIds.map(async (bookId) => ({
+        bookId,
+        copies: await listBookCopies(db, bookId, true)
+      }))
+    );
+
+    for (const group of copyGroups) {
+      copiesByBookId.set(group.bookId, group.copies);
+    }
+  }
+
   return {
-    items: rows.map(mapListRow),
+    items: rows.map((row) => ({
+      ...mapListRow(row, copyMap.get(row.id)),
+      copies: copiesByBookId.get(row.id)
+    })),
     total: Number(countRows[0]?.count ?? 0)
   };
 };
@@ -362,8 +396,13 @@ export const listPublicBooks = async (
     .from(books)
     .where(whereClause);
 
+  const copyMap = await getCopyCountsForBookIds(
+    db,
+    rows.map((row) => row.id)
+  );
+
   return {
-    items: rows.map(mapListRow),
+    items: rows.map((row) => mapListRow(row, copyMap.get(row.id))),
     total: Number(countRows[0]?.count ?? 0)
   };
 };
@@ -452,25 +491,34 @@ export const getBookById = async (db: DbClient, bookId: number) => {
     .where(eq(bookTags.bookId, bookId));
 
   const acquisitionRows = await db.select().from(acquisitions).where(eq(acquisitions.bookId, bookId)).limit(1);
-
-  const activeLoanRows = await db
-    .select({
-      id: loans.id,
-      borrowerName: loans.borrowerName,
-      borrowedAt: loans.borrowedAt,
-      expectedReturnAt: loans.expectedReturnAt,
-      status: loans.status
-    })
-    .from(loans)
-    .where(and(eq(loans.bookId, bookId), eq(loans.status, "borrowed")))
-    .limit(1);
+  const [copies, copyMap] = await Promise.all([
+    listBookCopies(db, bookId, true),
+    getCopyCountsForBookIds(db, [bookId])
+  ]);
+  const counts = copyMap.get(bookId);
+  const activeCopyLoan = copies.find((copy) => copy.status === "borrowed");
 
   return {
     ...book,
     contributors: contributorRows,
     tags: tagRows.map((item) => item.name),
     acquisition: acquisitionRows[0] ?? null,
-    activeLoan: activeLoanRows[0] ?? null,
+    activeLoan: activeCopyLoan
+      ? {
+          copyCode: activeCopyLoan.copyCode,
+          borrowerName: activeCopyLoan.borrowerName,
+          borrowerPhone: activeCopyLoan.borrowerPhone,
+          borrowedAt: activeCopyLoan.borrowedAt,
+          expectedReturnAt: activeCopyLoan.expectedReturnAt,
+          status: activeCopyLoan.status
+        }
+      : null,
+    copyCount: counts?.copyCount ?? (copies.length || 1),
+    availableCopyCount: counts?.availableCopyCount ?? copies.filter((copy) => copy.status === "available").length,
+    borrowedCopyCount: counts?.borrowedCopyCount ?? copies.filter((copy) => copy.status === "borrowed").length,
+    lostCopyCount: counts?.lostCopyCount ?? copies.filter((copy) => copy.status === "lost").length,
+    primaryCopyCode: counts?.primaryCopyCode,
+    copies,
     metadataSourceDetails: parseJsonSafely<Record<string, unknown>>(book.metadataSourceDetails)
   };
 };
@@ -540,6 +588,8 @@ export const createBook = async (db: DbClient, payload: BookPayloadInput) => {
 
   await insertRelations(db, createdBook.id, payload);
   await upsertAcquisition(db, createdBook.id, payload);
+  await createBookCopies(db, createdBook.id, createdBook.accessionCode, payload.copyCount ?? 1);
+  await syncBookStatusFromCopies(db, createdBook.id);
 
   await logActivity(db, {
     entityType: "book",
@@ -607,6 +657,23 @@ export const updateBook = async (db: DbClient, bookId: number, payload: BookPayl
   await clearBookRelations(db, bookId);
   await insertRelations(db, bookId, payload);
   await upsertAcquisition(db, bookId, payload);
+
+  if (payload.copyCount && payload.copyCount > 0) {
+    const rows = await db
+      .select({
+        accessionCode: books.accessionCode
+      })
+      .from(books)
+      .where(eq(books.id, bookId))
+      .limit(1);
+
+    const accessionCode = rows[0]?.accessionCode;
+    if (accessionCode) {
+      await createBookCopies(db, bookId, accessionCode, payload.copyCount);
+    }
+  }
+
+  await syncBookStatusFromCopies(db, bookId);
 
   await logActivity(db, {
     entityType: "book",
@@ -721,9 +788,16 @@ export const listLibraryOptions = async (db: DbClient) => {
   };
 };
 
-export const getPublicBookByCode = async (db: DbClient, shortCode: string) => {
+export const getPublicBookByCode = async (
+  db: DbClient,
+  shortCode: string,
+  options?: {
+    includePrivatePhone?: boolean;
+  }
+) => {
   const row = await db
     .select({
+      id: books.id,
       publicCode: books.publicCode,
       accessionCode: books.accessionCode,
       title: books.title,
@@ -757,6 +831,22 @@ export const getPublicBookByCode = async (db: DbClient, shortCode: string) => {
     return null;
   }
 
+  const [copies, copyMap] = await Promise.all([
+    listBookCopies(db, result.id, Boolean(options?.includePrivatePhone)),
+    getCopyCountsForBookIds(db, [result.id])
+  ]);
+  const counts = copyMap.get(result.id);
+  const activeLoans = copies
+    .filter((copy) => copy.status === "borrowed")
+    .map((copy) => ({
+      copyCode: copy.copyCode,
+      borrowerName: copy.borrowerName,
+      borrowerPhone: options?.includePrivatePhone ? copy.borrowerPhone : undefined,
+      borrowerPhoneMasked: copy.borrowerPhoneMasked,
+      borrowedAt: copy.borrowedAt,
+      expectedReturnAt: copy.expectedReturnAt
+    }));
+
   return {
     publicCode: result.publicCode,
     accessionCode: result.accessionCode,
@@ -774,6 +864,12 @@ export const getPublicBookByCode = async (db: DbClient, shortCode: string) => {
     languageName: result.languageName,
     categoryName: result.categoryName,
     publisherName: result.publisherName,
-    authors: splitCommaList(result.authors)
+    authors: splitCommaList(result.authors),
+    copyCount: counts?.copyCount ?? (copies.length || 1),
+    availableCopyCount: counts?.availableCopyCount ?? copies.filter((copy) => copy.status === "available").length,
+    borrowedCopyCount: counts?.borrowedCopyCount ?? activeLoans.length,
+    lostCopyCount: counts?.lostCopyCount ?? copies.filter((copy) => copy.status === "lost").length,
+    copies,
+    activeLoans
   };
 };

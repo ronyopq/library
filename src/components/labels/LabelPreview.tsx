@@ -1,9 +1,20 @@
-import Barcode from "react-barcode";
 import { QRCodeSVG } from "qrcode.react";
-import type { BookListItem } from "@shared/types";
+import { BarcodeSvg } from "@/components/common/BarcodeSvg";
+
+export interface LabelItem {
+  id: string;
+  bookId: number;
+  accessionCode: string;
+  publicCode: string;
+  title?: string;
+  authors: string[];
+  dateAdded: string;
+  copyCode: string;
+  barcodeValue: string;
+}
 
 interface LabelPreviewProps {
-  book: BookListItem;
+  item: LabelItem;
   libraryName: string;
   publicBaseUrl?: string;
   includeTitle: boolean;
@@ -13,7 +24,7 @@ interface LabelPreviewProps {
 }
 
 export const LabelPreview = ({
-  book,
+  item,
   libraryName,
   publicBaseUrl,
   includeTitle,
@@ -22,28 +33,22 @@ export const LabelPreview = ({
   includeQr
 }: LabelPreviewProps) => {
   const qrBase = publicBaseUrl || window.location.origin;
-  const qrValue = `${qrBase.replace(/\/$/, "")}/b/${book.publicCode}`;
+  const qrValue = `${qrBase.replace(/\/$/, "")}/b/${item.publicCode}`;
 
   return (
     <article className="label-item rounded-lg border border-app-border bg-white p-2 text-[10px] text-app-text">
       <p className="font-semibold text-[10px]">{libraryName}</p>
-      {includeTitle ? <p className="line-clamp-2 font-medium">{book.title || "Untitled"}</p> : null}
-      {includeAuthor ? <p className="line-clamp-1 text-[9px] text-app-muted">{book.authors.join(", ")}</p> : null}
-      {includeDate ? <p className="text-[9px] text-app-muted">{new Date(book.dateAdded).toLocaleDateString()}</p> : null}
+      {includeTitle ? <p className="line-clamp-2 font-medium">{item.title || "Untitled"}</p> : null}
+      {includeAuthor ? <p className="line-clamp-1 text-[9px] text-app-muted">{item.authors.join(", ")}</p> : null}
+      {includeDate ? <p className="text-[9px] text-app-muted">{new Date(item.dateAdded).toLocaleDateString()}</p> : null}
 
-      <div className="mt-1 flex items-end justify-between gap-1">
-        <Barcode
-          value={book.accessionCode}
-          height={28}
-          width={0.9}
-          displayValue={false}
-          margin={0}
-          background="transparent"
-          lineColor="#1f3f88"
-        />
+      <div className="mt-1 flex items-end justify-between gap-2">
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <BarcodeSvg value={item.barcodeValue} height={30} width={1.05} lineColor="#1f3f88" />
+        </div>
         {includeQr ? <QRCodeSVG value={qrValue} size={34} includeMargin={false} /> : null}
       </div>
-      <p className="mt-1 text-center text-[9px]">{book.accessionCode}</p>
+      <p className="mt-1 text-center text-[9px]">{item.copyCode}</p>
     </article>
   );
 };

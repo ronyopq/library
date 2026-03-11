@@ -1,9 +1,17 @@
-import type { acquisitionTypes, bookStatuses, contributorRoles, loanStatuses, staffRoles } from "./constants";
+import type {
+  acquisitionTypes,
+  bookStatuses,
+  contributorRoles,
+  loanRequestStatuses,
+  loanStatuses,
+  staffRoles
+} from "./constants";
 import type { BookPayloadInput, SettingsInput } from "./schemas";
 
 export type ContributorRole = (typeof contributorRoles)[number];
 export type BookStatus = (typeof bookStatuses)[number];
 export type LoanStatus = (typeof loanStatuses)[number];
+export type LoanRequestStatus = (typeof loanRequestStatuses)[number];
 export type AcquisitionType = (typeof acquisitionTypes)[number];
 export type StaffRole = (typeof staffRoles)[number];
 
@@ -19,6 +27,7 @@ export interface BookListItem {
   id: number;
   accessionCode: string;
   publicCode: string;
+  primaryCopyCode?: string;
   title?: string;
   subtitle?: string;
   authors: string[];
@@ -34,7 +43,28 @@ export interface BookListItem {
   rack?: string;
   shelf?: string;
   positionNote?: string;
+  copyCount: number;
+  availableCopyCount: number;
+  borrowedCopyCount: number;
+  lostCopyCount: number;
+  copies?: BookCopy[];
   dateAdded: string;
+}
+
+export interface BookCopy {
+  id: number;
+  bookId: number;
+  copyNumber: number;
+  copyCode: string;
+  barcodeValue: string;
+  status: BookStatus;
+  isArchived: boolean;
+  note?: string;
+  borrowerName?: string;
+  borrowerPhone?: string;
+  borrowerPhoneMasked?: string;
+  borrowedAt?: string;
+  expectedReturnAt?: string;
 }
 
 export interface DuplicateMatch {
@@ -70,10 +100,13 @@ export interface OcrExtractionResult {
 export interface LoanRecord {
   id: number;
   bookId: number;
+  bookCopyId?: number;
+  copyCode?: string;
   bookTitle?: string;
   accessionCode?: string;
   borrowerName: string;
   borrowerPhone?: string;
+  borrowerPhoneMasked?: string;
   borrowerEmail?: string;
   borrowedAt: string;
   expectedReturnAt?: string;
@@ -81,6 +114,25 @@ export interface LoanRecord {
   status: LoanStatus;
   note?: string;
   isOverdue: boolean;
+}
+
+export interface LoanRequestRecord {
+  id: number;
+  bookId: number;
+  requestedCopyId?: number;
+  copyCode?: string;
+  publicCode?: string;
+  bookTitle?: string;
+  requesterName: string;
+  requesterPhone?: string;
+  requesterPhoneMasked?: string;
+  requesterEmail?: string;
+  expectedReturnAt?: string;
+  note?: string;
+  adminNote?: string;
+  requestedAt: string;
+  reviewedAt?: string;
+  status: LoanRequestStatus;
 }
 
 export interface ActivityLogItem {
@@ -112,7 +164,8 @@ export interface BookReview {
   id: number;
   bookId: number;
   reviewerName: string;
-  reviewerPhone: string;
+  reviewerPhone?: string;
+  reviewerPhoneMasked?: string;
   rating: number;
   comment: string;
   createdAt: string;
