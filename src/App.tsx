@@ -1,7 +1,7 @@
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { PublicLayout } from "@/components/layout/PublicLayout";
-import { isAdminSessionActive } from "@/lib/adminAuth";
+import { isAdminSessionActive, isCurrentUserAdmin } from "@/lib/adminAuth";
 import { ActivityPage } from "@/pages/ActivityPage";
 import { ArchivedPage } from "@/pages/ArchivedPage";
 import { BookDetailsPage } from "@/pages/BookDetailsPage";
@@ -12,6 +12,7 @@ import { LoansPage } from "@/pages/LoansPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { PrintLabelsPage } from "@/pages/PrintLabelsPage";
 import { SettingsPage } from "@/pages/SettingsPage";
+import { UsersPage } from "@/pages/UsersPage";
 import { AdminLoginPage } from "@/pages/admin/AdminLoginPage";
 import { PublicBookPage } from "@/pages/public/PublicBookPage";
 import { PublicCatalogPage } from "@/pages/public/PublicCatalogPage";
@@ -21,6 +22,13 @@ const AdminGuard = () => {
     return <Navigate to="/admin/login" replace />;
   }
 
+  return <Outlet />;
+};
+
+const AdminOnlyGuard = () => {
+  if (!isCurrentUserAdmin()) {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
   return <Outlet />;
 };
 
@@ -47,6 +55,9 @@ export default function App() {
           <Route path="/admin/activity" element={<ActivityPage />} />
           <Route path="/admin/settings" element={<SettingsPage />} />
           <Route path="/admin/archived" element={<ArchivedPage />} />
+          <Route element={<AdminOnlyGuard />}>
+            <Route path="/admin/users" element={<UsersPage />} />
+          </Route>
         </Route>
       </Route>
 

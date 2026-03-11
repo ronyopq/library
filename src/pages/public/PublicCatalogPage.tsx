@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/api";
+import { resolveCoverImageUrl } from "@/lib/cover";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
 import { LoadingState } from "@/components/common/LoadingState";
@@ -89,6 +90,7 @@ export const PublicCatalogPage = () => {
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {books.map((book) => {
             const locationText = [book.room, book.cabinet, book.rack, book.shelf, book.positionNote].filter(Boolean).join(" / ");
+            const coverUrl = resolveCoverImageUrl(book.coverImageKey);
             return (
               <Link
                 key={book.id}
@@ -97,9 +99,9 @@ export const PublicCatalogPage = () => {
               >
                 <div className="grid grid-cols-[94px_1fr] gap-3">
                   <div className="h-34 w-24 overflow-hidden rounded-xl bg-app-surface">
-                    {book.coverImageKey ? (
+                    {coverUrl ? (
                       <img
-                        src={`/i/${encodeURIComponent(book.coverImageKey)}`}
+                        src={coverUrl}
                         alt={book.title ?? "Book cover"}
                         className="h-full w-full object-cover"
                       />

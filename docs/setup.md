@@ -53,6 +53,11 @@ npm run db:migrate:local
 npm run db:seed:local
 ```
 
+`db:migrate:*` now includes:
+- staff auth tables
+- public review tables
+- 30-book demo catalog with covers, reviews, and loan records
+
 ## 5) Run local development
 
 ```bash
@@ -69,6 +74,11 @@ Public/Admin routes:
 - Public catalog: `http://localhost:5173/`
 - Admin login: `http://localhost:5173/admin/login`
 - Admin panel: `http://localhost:5173/admin/dashboard`
+
+Default demo staff login:
+
+- Admin: `admin` / `Admin@1234`
+- Librarian: `librarian` / `Lib@1234`
 
 ## 6) Validate build and types
 

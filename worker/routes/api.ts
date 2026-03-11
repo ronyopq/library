@@ -5,11 +5,14 @@ import { z } from "zod";
 import {
   bookFilterSchema,
   bookPayloadSchema,
+  createStaffUserSchema,
   duplicateCheckSchema,
   isbnLookupSchema,
+  loginSchema,
   loanCreateSchema,
   loanReturnSchema,
   ocrExtractSchema,
+  publicReviewCreateSchema,
   settingsSchema
 } from "@shared/schemas";
 import type { AppBindings } from "../env";
@@ -28,6 +31,7 @@ import {
   getPublicCatalogSummary,
   listPublicBooks
 } from "../services/bookService";
+import { createStaffUser, listStaffUsers, loginWithPassword, logoutByToken, resolveAuthUser } from "../services/authService";
 import { getDashboardStats } from "../services/dashboardService";
 import { findDuplicateMatches } from "../services/duplicateService";
 import { exportBooksCsv, exportLoansCsv } from "../services/exportService";
@@ -35,6 +39,7 @@ import { storeCoverImage } from "../services/imageService";
 import { lookupIsbn } from "../services/isbnService";
 import { createLoan, listLoans, LoanConflictError, returnLoan } from "../services/loanService";
 import { extractMetadataFromImage } from "../services/ocrService";
+import { addPublicReview, getPublicReviewSummaryByCode } from "../services/reviewService";
 import { getSettings, updateSettings } from "../services/settingsService";
 import { badRequest, conflict, notFound, unauthorized } from "../utils/http";
 
@@ -43,18 +48,21 @@ const parseBookId = (value: string) => {
   return Number.isInteger(id) && id > 0 ? id : null;
 };
 
-const requireAdmin = async (c: any, next: () => Promise<void>) => {
-  const token = c.env.ADMIN_TOKEN;
-  if (!token) {
-    await next();
-    return;
+const requireStaff = async (c: any, next: () => Promise<void>) => {
+  const db = getDb(c.env);
+  const user = await resolveAuthUser(db, c.env, c.req.raw, c.req.query("token"));
+  if (!user) {
+    return unauthorized(c, "Please login first.");
   }
+  c.set("authUser", user);
+  await next();
+};
 
-  const provided = c.req.header("x-admin-token") ?? c.req.query("token");
-  if (!provided || provided !== token) {
-    return unauthorized(c);
+const requireAdminRole = async (c: any, next: () => Promise<void>) => {
+  const user = c.get("authUser");
+  if (!user || user.role !== "admin") {
+    return unauthorized(c, "Admin permission required.");
   }
-
   await next();
 };
 
@@ -87,12 +95,20 @@ apiRouter.get("/public/books", async (c) => {
 
 apiRouter.get("/public/books/:shortCode", async (c) => {
   const db = getDb(c.env);
-  const book = await getPublicBookByCode(db, c.req.param("shortCode"));
+  const shortCode = c.req.param("shortCode");
+  const book = await getPublicBookByCode(db, shortCode);
   if (!book) {
     return notFound(c, "Public book not found");
   }
 
-  return c.json({ book });
+  const reviews = await getPublicReviewSummaryByCode(db, shortCode);
+
+  return c.json({
+    book,
+    averageRating: reviews?.averageRating ?? 0,
+    ratingCount: reviews?.ratingCount ?? 0,
+    reviews: reviews?.reviews ?? []
+  });
 });
 
 apiRouter.get("/public/summary", async (c) => {
@@ -101,16 +117,85 @@ apiRouter.get("/public/summary", async (c) => {
   return c.json(summary);
 });
 
-apiRouter.use("/books*", requireAdmin);
-apiRouter.use("/isbn/*", requireAdmin);
-apiRouter.use("/ocr/*", requireAdmin);
-apiRouter.use("/images/*", requireAdmin);
-apiRouter.use("/dashboard", requireAdmin);
-apiRouter.use("/loans*", requireAdmin);
-apiRouter.use("/settings*", requireAdmin);
-apiRouter.use("/activity", requireAdmin);
-apiRouter.use("/options", requireAdmin);
-apiRouter.use("/export/*", requireAdmin);
+apiRouter.get("/public/books/:shortCode/reviews", async (c) => {
+  const db = getDb(c.env);
+  const summary = await getPublicReviewSummaryByCode(db, c.req.param("shortCode"));
+  if (!summary) {
+    return notFound(c, "Public book not found");
+  }
+
+  return c.json(summary);
+});
+
+apiRouter.post("/public/books/:shortCode/reviews", zValidator("json", publicReviewCreateSchema), async (c) => {
+  const db = getDb(c.env);
+  const payload = c.req.valid("json");
+  const summary = await addPublicReview(db, c.req.param("shortCode"), payload);
+  if (!summary) {
+    return notFound(c, "Public book not found");
+  }
+
+  return c.json(summary, 201);
+});
+
+apiRouter.post("/auth/login", zValidator("json", loginSchema), async (c) => {
+  const db = getDb(c.env);
+  const payload = c.req.valid("json");
+
+  try {
+    const session = await loginWithPassword(db, payload);
+    if (!session) {
+      return unauthorized(c, "Invalid username or password.");
+    }
+
+    return c.json(session);
+  } catch (error) {
+    return badRequest(c, error instanceof Error ? error.message : "Login failed.");
+  }
+});
+
+apiRouter.get("/auth/me", requireStaff, async (c) => {
+  return c.json({
+    user: c.get("authUser")
+  });
+});
+
+apiRouter.post("/auth/logout", requireStaff, async (c) => {
+  const db = getDb(c.env);
+  await logoutByToken(db, c.req.raw, c.req.query("token"));
+  return c.json({ ok: true });
+});
+
+apiRouter.use("/users*", requireStaff);
+apiRouter.use("/books*", requireStaff);
+apiRouter.use("/isbn/*", requireStaff);
+apiRouter.use("/ocr/*", requireStaff);
+apiRouter.use("/images/*", requireStaff);
+apiRouter.use("/dashboard", requireStaff);
+apiRouter.use("/loans*", requireStaff);
+apiRouter.use("/settings*", requireStaff);
+apiRouter.use("/activity", requireStaff);
+apiRouter.use("/options", requireStaff);
+apiRouter.use("/export/*", requireStaff);
+
+apiRouter.get("/users", requireStaff, requireAdminRole, async (c) => {
+  const db = getDb(c.env);
+  const users = await listStaffUsers(db);
+  return c.json({ users });
+});
+
+apiRouter.post("/users", requireStaff, requireAdminRole, zValidator("json", createStaffUserSchema), async (c) => {
+  const db = getDb(c.env);
+  const payload = c.req.valid("json");
+  const actor = c.get("authUser");
+
+  try {
+    const user = await createStaffUser(db, payload, actor);
+    return c.json({ user }, 201);
+  } catch (error) {
+    return badRequest(c, error instanceof Error ? error.message : "Unable to create staff user.");
+  }
+});
 
 apiRouter.get("/books", async (c) => {
   const db = getDb(c.env);

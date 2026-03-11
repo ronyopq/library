@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { acquisitionTypes, bookStatuses, contributorRoles, loanStatuses } from "./constants";
+import { acquisitionTypes, bookStatuses, contributorRoles, loanStatuses, staffRoles } from "./constants";
 
 const optionalText = z
   .string()
@@ -152,6 +152,26 @@ export const settingsSchema = z.object({
   labelHeightMm: z.number().int().min(15).max(120).default(30)
 });
 
+export const loginSchema = z.object({
+  username: z.string().trim().min(3).max(60),
+  password: z.string().min(6).max(200)
+});
+
+export const createStaffUserSchema = z.object({
+  username: z.string().trim().min(3).max(60),
+  password: z.string().min(6).max(200),
+  fullName: optionalText,
+  phone: optionalText,
+  role: z.enum(staffRoles).default("librarian")
+});
+
+export const publicReviewCreateSchema = z.object({
+  reviewerName: z.string().trim().min(2).max(120),
+  reviewerPhone: z.string().trim().min(5).max(30),
+  rating: z.number().int().min(1).max(5),
+  comment: z.string().trim().min(2).max(1500)
+});
+
 export type BookPayloadInput = z.infer<typeof bookPayloadSchema>;
 export type BookFilterInput = z.infer<typeof bookFilterSchema>;
 export type DuplicateCheckInput = z.infer<typeof duplicateCheckSchema>;
@@ -161,3 +181,6 @@ export type LoanCreateInput = z.infer<typeof loanCreateSchema>;
 export type LoanReturnInput = z.infer<typeof loanReturnSchema>;
 export type SettingsInput = z.infer<typeof settingsSchema>;
 export type AcquisitionInput = z.infer<typeof acquisitionSchema>;
+export type LoginInput = z.infer<typeof loginSchema>;
+export type CreateStaffUserInput = z.infer<typeof createStaffUserSchema>;
+export type PublicReviewCreateInput = z.infer<typeof publicReviewCreateSchema>;

@@ -1,6 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { apiRequest } from "@/lib/api";
+import { resolveCoverImageUrl } from "@/lib/cover";
 import { ErrorState } from "@/components/common/ErrorState";
 import { LoadingState } from "@/components/common/LoadingState";
 
@@ -24,11 +26,28 @@ interface PublicBookResponse {
     shelf?: string;
     positionNote?: string;
   };
+  averageRating: number;
+  ratingCount: number;
+  reviews: Array<{
+    id: number;
+    reviewerName: string;
+    reviewerPhone: string;
+    rating: number;
+    comment: string;
+    createdAt: string;
+  }>;
 }
 
 export const PublicBookPage = () => {
   const params = useParams();
   const shortCode = params.shortCode ?? "";
+  const queryClient = useQueryClient();
+  const [reviewForm, setReviewForm] = useState({
+    reviewerName: "",
+    reviewerPhone: "",
+    rating: 5,
+    comment: ""
+  });
 
   const query = useQuery({
     queryKey: ["public-book", shortCode],
@@ -36,11 +55,32 @@ export const PublicBookPage = () => {
     enabled: shortCode.length > 0
   });
 
+  const reviewMutation = useMutation({
+    mutationFn: () =>
+      apiRequest(`/api/public/books/${shortCode}/reviews`, {
+        method: "POST",
+        body: JSON.stringify(reviewForm)
+      }),
+    onSuccess: () => {
+      setReviewForm({
+        reviewerName: "",
+        reviewerPhone: "",
+        rating: 5,
+        comment: ""
+      });
+      queryClient.invalidateQueries({ queryKey: ["public-book", shortCode] });
+    },
+    onError: (error) => {
+      alert((error as Error).message);
+    }
+  });
+
   if (query.isLoading) return <LoadingState label="Loading public book details..." />;
   if (query.isError || !query.data) return <ErrorState message={(query.error as Error)?.message || "Book not found"} />;
 
   const { book } = query.data;
   const location = [book.room, book.cabinet, book.rack, book.shelf, book.positionNote].filter(Boolean).join(" / ");
+  const coverUrl = resolveCoverImageUrl(book.coverImageKey);
 
   return (
     <div className="space-y-4">
@@ -50,8 +90,8 @@ export const PublicBookPage = () => {
 
       <article className="grid gap-4 rounded-3xl border border-app-border bg-white p-5 shadow-card md:grid-cols-[220px_1fr]">
         <div className="overflow-hidden rounded-2xl bg-app-surface">
-          {book.coverImageKey ? (
-            <img src={`/i/${encodeURIComponent(book.coverImageKey)}`} alt={book.title ?? "Book cover"} className="h-full w-full object-cover" />
+          {coverUrl ? (
+            <img src={coverUrl} alt={book.title ?? "Book cover"} className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full min-h-72 items-center justify-center text-sm text-app-muted">No cover image</div>
           )}
@@ -69,6 +109,9 @@ export const PublicBookPage = () => {
             <p><strong>Language:</strong> {book.languageName || "Unknown"}</p>
             <p><strong>Shelf:</strong> {location || "Not specified"}</p>
             <p><strong>Code:</strong> {book.publicCode}</p>
+            <p>
+              <strong>Average Rating:</strong> {query.data.averageRating.toFixed(2)} / 5 ({query.data.ratingCount} ratings)
+            </p>
           </div>
 
           {book.summary ? (
@@ -86,6 +129,87 @@ export const PublicBookPage = () => {
           ) : null}
         </div>
       </article>
+
+      <section className="rounded-3xl border border-app-border bg-white p-5 shadow-card">
+        <h3 className="font-heading text-xl">Ratings and Comments</h3>
+        <p className="mt-1 text-sm text-app-muted">
+          Share your reading feedback with your name and phone number.
+        </p>
+
+        <form
+          className="mt-4 grid gap-3 md:grid-cols-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            reviewMutation.mutate();
+          }}
+        >
+          <input
+            value={reviewForm.reviewerName}
+            onChange={(event) => setReviewForm((prev) => ({ ...prev, reviewerName: event.target.value }))}
+            placeholder="Your name"
+            required
+            className="rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm"
+          />
+          <input
+            value={reviewForm.reviewerPhone}
+            onChange={(event) => setReviewForm((prev) => ({ ...prev, reviewerPhone: event.target.value }))}
+            placeholder="Mobile number"
+            required
+            className="rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm"
+          />
+          <label className="text-sm">
+            Rating
+            <select
+              value={reviewForm.rating}
+              onChange={(event) => setReviewForm((prev) => ({ ...prev, rating: Number(event.target.value) }))}
+              className="mt-1 w-full rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm"
+            >
+              {[5, 4, 3, 2, 1].map((value) => (
+                <option key={value} value={value}>
+                  {value} Star
+                </option>
+              ))}
+            </select>
+          </label>
+          <div />
+          <textarea
+            value={reviewForm.comment}
+            onChange={(event) => setReviewForm((prev) => ({ ...prev, comment: event.target.value }))}
+            placeholder="Write your comment..."
+            required
+            className="md:col-span-2 min-h-24 rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm"
+          />
+          <div className="md:col-span-2 flex justify-end">
+            <button
+              type="submit"
+              disabled={reviewMutation.isPending}
+              className="rounded-xl bg-app-primary px-4 py-2 text-sm font-medium text-white hover:bg-app-primary-strong disabled:opacity-60"
+            >
+              {reviewMutation.isPending ? "Submitting..." : "Submit Review"}
+            </button>
+          </div>
+        </form>
+
+        <div className="mt-5 space-y-3">
+          {query.data.reviews.length === 0 ? (
+            <p className="text-sm text-app-muted">No reviews yet.</p>
+          ) : (
+            query.data.reviews.map((review) => (
+              <article key={review.id} className="rounded-xl border border-app-border bg-app-surface p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-medium text-sm">{review.reviewerName} ({review.reviewerPhone})</p>
+                  <p className="text-sm text-app-muted">
+                    {"★".repeat(review.rating)}
+                    {"☆".repeat(Math.max(0, 5 - review.rating))}
+                  </p>
+                </div>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-app-text">{review.comment}</p>
+                <p className="mt-1 text-xs text-app-muted">{new Date(review.createdAt).toLocaleString()}</p>
+              </article>
+            ))
+          )}
+        </div>
+      </section>
     </div>
   );
 };

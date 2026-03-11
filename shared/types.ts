@@ -1,10 +1,19 @@
-import type { acquisitionTypes, bookStatuses, contributorRoles, loanStatuses } from "./constants";
+import type { acquisitionTypes, bookStatuses, contributorRoles, loanStatuses, staffRoles } from "./constants";
 import type { BookPayloadInput, SettingsInput } from "./schemas";
 
 export type ContributorRole = (typeof contributorRoles)[number];
 export type BookStatus = (typeof bookStatuses)[number];
 export type LoanStatus = (typeof loanStatuses)[number];
 export type AcquisitionType = (typeof acquisitionTypes)[number];
+export type StaffRole = (typeof staffRoles)[number];
+
+export interface AuthUser {
+  id: number;
+  username: string;
+  fullName?: string;
+  phone?: string;
+  role: StaffRole;
+}
 
 export interface BookListItem {
   id: number;
@@ -97,6 +106,16 @@ export interface DashboardStats {
   recentActivity: ActivityLogItem[];
   categoryDistribution: Array<{ name: string; count: number }>;
   languageDistribution: Array<{ name: string; count: number }>;
+}
+
+export interface BookReview {
+  id: number;
+  bookId: number;
+  reviewerName: string;
+  reviewerPhone: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
 }
 
 export interface LibraryOptions {

@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ErrorState } from "@/components/common/ErrorState";
 import { LoadingState } from "@/components/common/LoadingState";
 import { apiRequest } from "@/lib/api";
+import { resolveCoverImageUrl } from "@/lib/cover";
 import { formatDate } from "@/lib/date";
 
 export const BookDetailsPage = () => {
@@ -40,6 +41,7 @@ export const BookDetailsPage = () => {
   if (query.isError || !query.data) return <ErrorState message={(query.error as Error).message || "Book not found"} />;
 
   const book = query.data;
+  const coverUrl = resolveCoverImageUrl(book.coverImageKey);
   const qrValue = `${window.location.origin}/b/${book.publicCode}`;
 
   return (
@@ -80,9 +82,9 @@ export const BookDetailsPage = () => {
 
       <section className="grid gap-4 lg:grid-cols-[220px_1fr]">
         <aside className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
-          {book.coverImageKey ? (
+          {coverUrl ? (
             <img
-              src={`/i/${encodeURIComponent(book.coverImageKey)}`}
+              src={coverUrl}
               alt={book.title ?? "cover"}
               className="h-72 w-full rounded-lg object-cover"
             />

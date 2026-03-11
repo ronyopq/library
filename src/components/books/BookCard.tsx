@@ -1,5 +1,6 @@
 import type { BookListItem } from "@shared/types";
 import { Link } from "react-router-dom";
+import { resolveCoverImageUrl } from "@/lib/cover";
 import { formatDate } from "@/lib/date";
 
 interface BookCardProps {
@@ -10,12 +11,14 @@ interface BookCardProps {
 }
 
 export const BookCard = ({ book, onArchive, onRestore, onDelete }: BookCardProps) => {
+  const coverUrl = resolveCoverImageUrl(book.coverImageKey);
+
   return (
     <article className="group overflow-hidden rounded-2xl border border-app-border bg-white shadow-card transition hover:-translate-y-0.5 hover:border-app-primary">
       <div className="grid grid-cols-[96px_1fr] gap-3 p-3">
         <div className="h-36 w-24 overflow-hidden rounded-xl bg-app-surface">
-          {book.coverImageKey ? (
-            <img src={`/i/${encodeURIComponent(book.coverImageKey)}`} alt={book.title ?? "Book cover"} className="h-full w-full object-cover" />
+          {coverUrl ? (
+            <img src={coverUrl} alt={book.title ?? "Book cover"} className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full items-center justify-center text-xs text-app-muted">No Cover</div>
           )}

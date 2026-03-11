@@ -51,7 +51,12 @@ app.get("/b/:shortId", async (c) => {
   const dateAdded = new Date(book.dateAdded).toLocaleDateString("en-US");
   const location = escapeHtml([book.room, book.cabinet, book.rack, book.shelf, book.positionNote].filter(Boolean).join(" / "));
   const notes = escapeHtml(book.publicNotes ?? book.summary ?? "");
-  const coverUrl = book.coverImageKey ? `/i/${encodeURIComponent(book.coverImageKey)}` : "";
+  const coverUrl = book.coverImageKey
+    ? /^https?:\/\//i.test(book.coverImageKey)
+      ? book.coverImageKey
+      : `/i/${encodeURIComponent(book.coverImageKey)}`
+    : "";
+  const safeCoverUrl = escapeHtml(coverUrl);
 
   const html = `<!doctype html>
 <html lang="en">
@@ -153,7 +158,7 @@ app.get("/b/:shortId", async (c) => {
       ${subtitle ? `<p class="subtitle">${subtitle}</p>` : ""}
     </header>
     <section class="content">
-      <div>${coverUrl ? `<img class="cover" src="${coverUrl}" alt="${title}" />` : `<div class="cover"></div>`}</div>
+      <div>${safeCoverUrl ? `<img class="cover" src="${safeCoverUrl}" alt="${title}" />` : `<div class="cover"></div>`}</div>
       <div class="meta">
         ${authors ? `<div><strong>Author:</strong> ${authors}</div>` : ""}
         ${publisher ? `<div><strong>Publisher:</strong> ${publisher}</div>` : ""}

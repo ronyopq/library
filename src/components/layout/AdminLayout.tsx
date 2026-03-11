@@ -1,21 +1,28 @@
-import { BookOpenText, Boxes, LayoutDashboard, LogOut, Printer, ScrollText, Settings, UsersRound } from "lucide-react";
-import { useState } from "react";
+import { BookOpenText, Boxes, LayoutDashboard, LogOut, Printer, ScrollText, Settings, ShieldCheck, UsersRound } from "lucide-react";
+import { useMemo, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { clearAdminSession } from "@/lib/adminAuth";
-
-const navItems = [
-  { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/admin/library", label: "Library", icon: BookOpenText },
-  { to: "/admin/books/new", label: "Add Book", icon: Boxes },
-  { to: "/admin/loans", label: "Loans", icon: UsersRound },
-  { to: "/admin/labels", label: "Print Labels", icon: Printer },
-  { to: "/admin/activity", label: "Activity", icon: ScrollText },
-  { to: "/admin/settings", label: "Settings", icon: Settings }
-];
+import { clearAdminSession, getStoredAuthUser, isCurrentUserAdmin } from "@/lib/adminAuth";
+import { apiRequest } from "@/lib/api";
 
 export const AdminLayout = () => {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const currentUser = getStoredAuthUser();
+  const canManageUsers = isCurrentUserAdmin();
+
+  const navItems = useMemo(
+    () => [
+      { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { to: "/admin/library", label: "Library", icon: BookOpenText },
+      { to: "/admin/books/new", label: "Add Book", icon: Boxes },
+      { to: "/admin/loans", label: "Loans", icon: UsersRound },
+      { to: "/admin/labels", label: "Print Labels", icon: Printer },
+      { to: "/admin/activity", label: "Activity", icon: ScrollText },
+      { to: "/admin/settings", label: "Settings", icon: Settings },
+      ...(canManageUsers ? [{ to: "/admin/users", label: "Staff Users", icon: ShieldCheck }] : [])
+    ],
+    [canManageUsers]
+  );
 
   return (
     <div className="min-h-screen bg-app-bg text-app-text">
@@ -24,6 +31,9 @@ export const AdminLayout = () => {
           <div className="mb-6 px-2">
             <p className="text-xs uppercase tracking-[0.16em] text-app-muted">Admin Panel</p>
             <h1 className="mt-2 font-heading text-xl text-app-text">Personal Library</h1>
+            <p className="mt-2 text-xs text-app-muted">
+              Signed in as {currentUser?.username ?? "unknown"} ({currentUser?.role ?? "staff"})
+            </p>
           </div>
 
           <nav className="space-y-1">
@@ -61,7 +71,12 @@ export const AdminLayout = () => {
 
           <button
             type="button"
-            onClick={() => {
+            onClick={async () => {
+              try {
+                await apiRequest("/api/auth/logout", { method: "POST" });
+              } catch {
+                // no-op
+              }
               clearAdminSession();
               navigate("/admin/login");
             }}

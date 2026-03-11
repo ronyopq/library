@@ -14,11 +14,11 @@ This outputs static files to `dist/`, which are served by Worker assets binding.
 npm run db:migrate:remote
 ```
 
-Optional initial seed:
-
-```bash
-wrangler d1 execute library-db --remote --file drizzle/0001_seed.sql
-```
+This migration sequence now also provisions:
+- staff authentication tables
+- public review tables
+- 30 demo books with covers
+- demo loan and review entries
 
 ## 3) Deploy Worker + assets
 

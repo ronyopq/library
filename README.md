@@ -11,7 +11,7 @@ Production-ready MVP for a personal home-library system with clean admin/public 
 ## Product Model
 
 - Public side (read-only): browse and search public books by title/author/code/shelf location
-- Admin side (authenticated by token): add/edit/archive/restore/delete books, manage loans, settings, labels, activity
+- Admin side (authenticated by username/password): add/edit/archive/restore/delete books, manage loans, settings, labels, activity
 - Short public book links: `/b/r123`
 
 ## MVP Features Included
@@ -33,11 +33,19 @@ Production-ready MVP for a personal home-library system with clean admin/public 
 - Barcode + QR generation
 - Label print page with configurable fields
 - Public safe book page (`/b/:shortId`) with privacy-safe field boundary
+- Public comments and star ratings (name + mobile required)
 - Soft delete (archive) + restore + protected permanent delete
 - Activity log
 - CSV export (books + loans)
 - Mobile form draft auto-save in local storage
 - Settings page for library branding + print defaults + public behavior
+- Role-based staff accounts:
+  - `admin` can create staff IDs/passwords
+  - `librarian` can manage catalog and loans
+- Demo-ready seeded data:
+  - 30 category-diverse books with covers and metadata
+  - seeded ratings/comments
+  - seeded loan records
 
 ## Why This Stack For Cloudflare
 
@@ -122,6 +130,17 @@ Copy `.env.example` to `.env` for local use.
 - `OCR_SPACE_API_KEY` optional OCR provider key
 - `PUBLIC_BASE_URL` optional default base URL for QR/public links
 
+## Default Demo Staff Login
+
+- Admin:
+  - Username: `admin`
+  - Password: `Admin@1234`
+- Librarian:
+  - Username: `librarian`
+  - Password: `Lib@1234`
+
+After admin login, create additional staff users from `/admin/users`.
+
 ## Routes
 
 - Public SPA:
@@ -136,10 +155,17 @@ Copy `.env.example` to `.env` for local use.
 ## Core API Routes
 
 - Public APIs (no admin token required):
+  - `POST /api/auth/login`
+  - `GET /api/auth/me`
+  - `POST /api/auth/logout`
   - `GET /api/public/books`
   - `GET /api/public/books/:shortCode`
+  - `GET /api/public/books/:shortCode/reviews`
+  - `POST /api/public/books/:shortCode/reviews`
   - `GET /api/public/summary`
 - Admin book APIs:
+  - `GET /api/users` (admin only)
+  - `POST /api/users` (admin only)
   - `GET /api/books`
   - `GET /api/books/:id`
   - `POST /api/books`

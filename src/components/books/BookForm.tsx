@@ -4,6 +4,7 @@ import type { BookPayloadInput } from "@shared/schemas";
 import type { DuplicateMatch, IsbnLookupResult, OcrExtractionResult } from "@shared/types";
 import { apiRequest } from "@/lib/api";
 import { clearDraft, loadDraft, saveDraft } from "@/lib/draftStore";
+import { resolveCoverImageUrl } from "@/lib/cover";
 import { fileToDataUrl } from "@/lib/crop";
 import { CoverCropper } from "./CoverCropper";
 import { DuplicateWarning } from "./DuplicateWarning";
@@ -175,9 +176,7 @@ const inputClass =
   "w-full rounded-xl border border-app-border bg-white px-3 py-2 text-sm text-app-text placeholder:text-app-muted focus:border-app-primary focus:outline-none";
 
 export const BookForm = ({ bookId, initialData, draftKey, onSaved }: BookFormProps) => {
-  const [coverPreview, setCoverPreview] = useState<string | undefined>(
-    initialData?.coverImageKey ? `/i/${encodeURIComponent(initialData.coverImageKey)}` : undefined
-  );
+  const [coverPreview, setCoverPreview] = useState<string | undefined>(resolveCoverImageUrl(initialData?.coverImageKey));
   const [coverImageKey, setCoverImageKey] = useState<string | undefined>(initialData?.coverImageKey);
   const [cropSource, setCropSource] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);

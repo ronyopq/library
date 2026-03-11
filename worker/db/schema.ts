@@ -219,6 +219,63 @@ export const loans = sqliteTable(
   })
 );
 
+export const users = sqliteTable(
+  "users",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    username: text("username").notNull().unique(),
+    usernameNormalized: text("username_normalized").notNull().unique(),
+    fullName: text("full_name"),
+    phone: text("phone"),
+    role: text("role").notNull().default("librarian"),
+    passwordHash: text("password_hash").notNull(),
+    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+    ...timestampColumns
+  },
+  (table) => ({
+    roleIdx: index("idx_users_role").on(table.role),
+    activeIdx: index("idx_users_active").on(table.isActive)
+  })
+);
+
+export const authSessions = sqliteTable(
+  "auth_sessions",
+  {
+    token: text("token").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: text("expires_at").notNull(),
+    lastSeenAt: text("last_seen_at"),
+    createdAt: text("created_at").notNull().default("CURRENT_TIMESTAMP")
+  },
+  (table) => ({
+    userIdx: index("idx_auth_sessions_user").on(table.userId),
+    expiryIdx: index("idx_auth_sessions_expiry").on(table.expiresAt)
+  })
+);
+
+export const bookReviews = sqliteTable(
+  "book_reviews",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    bookId: integer("book_id")
+      .notNull()
+      .references(() => books.id, { onDelete: "cascade" }),
+    reviewerName: text("reviewer_name").notNull(),
+    reviewerPhone: text("reviewer_phone").notNull(),
+    rating: integer("rating").notNull(),
+    comment: text("comment").notNull(),
+    isHidden: integer("is_hidden", { mode: "boolean" }).notNull().default(false),
+    ...timestampColumns
+  },
+  (table) => ({
+    bookIdx: index("idx_book_reviews_book").on(table.bookId),
+    ratingIdx: index("idx_book_reviews_rating").on(table.rating),
+    createdIdx: index("idx_book_reviews_created").on(table.createdAt)
+  })
+);
+
 export const metadataSources = sqliteTable(
   "metadata_sources",
   {

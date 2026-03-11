@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorState } from "@/components/common/ErrorState";
 import { LoadingState } from "@/components/common/LoadingState";
 import { apiRequest } from "@/lib/api";
+import { getStoredAuthUser, isCurrentUserAdmin } from "@/lib/adminAuth";
 
 interface SettingsForm {
   libraryName: string;
@@ -26,7 +27,8 @@ interface SettingsForm {
 export const SettingsPage = () => {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<SettingsForm | null>(null);
-  const [adminToken, setAdminToken] = useState(localStorage.getItem("library_admin_token") ?? "");
+  const currentUser = getStoredAuthUser();
+  const canManageUsers = isCurrentUserAdmin();
 
   const query = useQuery({
     queryKey: ["settings"],
@@ -111,18 +113,15 @@ export const SettingsPage = () => {
       </section>
 
       <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
-        <h3 className="font-heading text-base">Admin API Token (Browser)</h3>
-        <input value={adminToken} onChange={(event) => setAdminToken(event.target.value)} placeholder="x-admin-token" className="mt-2 w-full rounded-xl border border-app-border px-3 py-2 text-sm" />
-        <button
-          type="button"
-          onClick={() => {
-            localStorage.setItem("library_admin_token", adminToken);
-            alert("Admin token saved in this browser.");
-          }}
-          className="mt-3 rounded-lg border border-app-border px-3 py-2 text-sm"
-        >
-          Save Token
-        </button>
+        <h3 className="font-heading text-base">Current Staff Session</h3>
+        <p className="mt-2 text-sm text-app-muted">
+          Signed in as <strong>{currentUser?.username ?? "unknown"}</strong> ({currentUser?.role ?? "staff"}).
+        </p>
+        {canManageUsers ? (
+          <a href="/admin/users" className="mt-3 inline-block rounded-lg border border-app-border px-3 py-2 text-sm hover:bg-app-surface">
+            Manage Staff Users
+          </a>
+        ) : null}
       </section>
 
       <div className="flex justify-end">

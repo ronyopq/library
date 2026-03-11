@@ -1,6 +1,5 @@
 import type { ApiError } from "@shared/types";
-
-const getAdminToken = () => localStorage.getItem("library_admin_token") ?? "";
+import { getStoredAuthToken } from "./adminAuth";
 
 interface RequestOptions extends RequestInit {
   params?: Record<string, string | number | boolean | undefined>;
@@ -19,12 +18,14 @@ const buildUrl = (path: string, params?: RequestOptions["params"]) => {
 
 export const apiRequest = async <T>(path: string, options: RequestOptions = {}): Promise<T> => {
   const { params, headers, ...rest } = options;
+  const authToken = getStoredAuthToken();
 
   const response = await fetch(buildUrl(path, params), {
     ...rest,
     headers: {
       "content-type": "application/json",
-      "x-admin-token": getAdminToken(),
+      "x-auth-token": authToken,
+      "x-admin-token": authToken,
       ...headers
     }
   });
@@ -45,9 +46,11 @@ export const apiRequest = async <T>(path: string, options: RequestOptions = {}):
 };
 
 export const downloadFile = async (path: string) => {
+  const authToken = getStoredAuthToken();
   const response = await fetch(path, {
     headers: {
-      "x-admin-token": getAdminToken()
+      "x-auth-token": authToken,
+      "x-admin-token": authToken
     }
   });
 

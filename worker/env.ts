@@ -1,3 +1,5 @@
+import type { AuthUser } from "@shared/types";
+
 export interface Env {
   DB: D1Database;
   LIBRARY_KV: KVNamespace;
@@ -10,4 +12,7 @@ export interface Env {
 
 export type AppBindings = {
   Bindings: Env;
+  Variables: {
+    authUser?: AuthUser;
+  };
 };
