@@ -199,6 +199,20 @@ export const publicReviewCreateSchema = z.object({
   comment: z.string().trim().min(2).max(1500)
 });
 
+export const adminReviewUpdateSchema = z.object({
+  reviewerName: z.string().trim().min(2).max(120),
+  reviewerPhone: z.string().trim().min(5).max(30),
+  rating: z.number().int().min(1).max(5),
+  comment: z.string().trim().min(2).max(1500),
+  isHidden: z.boolean().optional()
+});
+
+export const optionDomainSchema = z.enum(["category", "language", "publisher", "tag"]);
+
+export const optionValueSchema = z.object({
+  name: z.string().trim().min(1).max(120)
+});
+
 export type BookPayloadInput = z.infer<typeof bookPayloadSchema>;
 export type BookFilterInput = z.infer<typeof bookFilterSchema>;
 export type DuplicateCheckInput = z.infer<typeof duplicateCheckSchema>;
@@ -213,3 +227,6 @@ export type AcquisitionInput = z.infer<typeof acquisitionSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateStaffUserInput = z.infer<typeof createStaffUserSchema>;
 export type PublicReviewCreateInput = z.infer<typeof publicReviewCreateSchema>;
+export type AdminReviewUpdateInput = z.infer<typeof adminReviewUpdateSchema>;
+export type OptionDomainInput = z.infer<typeof optionDomainSchema>;
+export type OptionValueInput = z.infer<typeof optionValueSchema>;

@@ -175,6 +175,9 @@ export interface LibraryOptions {
   categories: string[];
   authors: string[];
   languages: string[];
+  publishers: string[];
+  formats: string[];
+  conditions: string[];
   statuses: string[];
   locations: string[];
   tags: string[];

@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
 import { LoadingState } from "@/components/common/LoadingState";
@@ -58,6 +59,7 @@ const defaultLoan: NewLoanForm = {
 };
 
 export const LoansPage = () => {
+  const [searchParams] = useSearchParams();
   const [form, setForm] = useState<NewLoanForm>(defaultLoan);
   const [decisionState, setDecisionState] = useState<Record<number, { requestedCopyId: string; expectedReturnAt: string; adminNote: string; allowOverride: boolean }>>({});
   const queryClient = useQueryClient();
@@ -160,6 +162,22 @@ export const LoansPage = () => {
   const books = booksQuery.data?.items ?? [];
   const loans = loansQuery.data?.loans ?? [];
   const requests = requestsQuery.data?.requests ?? [];
+  const statusFilter = searchParams.get("status");
+  const focusRequestId = searchParams.get("focusRequest") ? Number(searchParams.get("focusRequest")) : undefined;
+
+  const filteredLoans = loans.filter((loan) => {
+    if (!statusFilter) return true;
+    if (statusFilter === "overdue") return loan.status === "borrowed" && isOverdue(loan.expectedReturnAt, loan.status);
+    return loan.status === statusFilter;
+  });
+
+  useEffect(() => {
+    if (!focusRequestId) return;
+    const node = document.getElementById(`loan-request-${focusRequestId}`);
+    if (node) {
+      node.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [focusRequestId, requests.length]);
 
   return (
     <div className="space-y-4">
@@ -168,7 +186,7 @@ export const LoansPage = () => {
         <p className="text-sm text-app-muted">Handle public requests, create manual loans, and manage returns copy-wise.</p>
       </header>
 
-      <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
+      <section id="requests" className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
         <h3 className="font-heading text-base">Pending Borrow Requests</h3>
         {requests.length === 0 ? (
           <p className="mt-2 text-sm text-app-muted">No pending requests.</p>
@@ -185,7 +203,13 @@ export const LoansPage = () => {
               };
 
               return (
-                <article key={request.id} className="rounded-xl border border-app-border p-3">
+                <article
+                  id={`loan-request-${request.id}`}
+                  key={request.id}
+                  className={`rounded-xl border p-3 ${
+                    focusRequestId === request.id ? "border-app-primary bg-blue-50/50" : "border-app-border"
+                  }`}
+                >
                   <p className="font-medium">
                     {request.bookTitle || "Unknown book"} ({request.publicCode || "-"})
                   </p>
@@ -365,8 +389,15 @@ export const LoansPage = () => {
       </section>
 
       <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
-        <h3 className="font-heading text-base">Loan History</h3>
-        {loans.length === 0 ? (
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="font-heading text-base">Loan History</h3>
+          {statusFilter ? (
+            <p className="text-xs text-app-muted">
+              Filter: <strong>{statusFilter}</strong>
+            </p>
+          ) : null}
+        </div>
+        {filteredLoans.length === 0 ? (
           <EmptyState title="No loans yet" description="Created loans will appear here." />
         ) : (
           <div className="mt-3 overflow-x-auto">
@@ -383,7 +414,7 @@ export const LoansPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {loans.map((loan) => (
+                {filteredLoans.map((loan) => (
                   <tr key={loan.id} className="border-t border-app-border">
                     <td className="p-2">
                       <p className="font-medium">{loan.bookTitle || "Unknown"}</p>

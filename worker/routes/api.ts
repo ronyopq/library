@@ -3,12 +3,15 @@ import { and, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import {
+  adminReviewUpdateSchema,
   bookFilterSchema,
   bookPayloadSchema,
   createStaffUserSchema,
   duplicateCheckSchema,
   isbnLookupSchema,
   loanRequestDecisionSchema,
+  optionDomainSchema,
+  optionValueSchema,
   loginSchema,
   loanCreateSchema,
   loanReturnSchema,
@@ -25,6 +28,7 @@ import {
   getBookById,
   listBooks,
   listLibraryOptions,
+  listPublicFilterOptions,
   restoreBook,
   updateBook,
   archiveBook,
@@ -42,8 +46,20 @@ import { lookupIsbn } from "../services/isbnService";
 import { createLoan, listLoans, LoanConflictError, returnLoan } from "../services/loanService";
 import { createPublicLoanRequest, decideLoanRequest, listLoanRequests } from "../services/loanRequestService";
 import { extractMetadataFromImage } from "../services/ocrService";
-import { addPublicReview, getPublicReviewSummaryByCode } from "../services/reviewService";
+import {
+  addPublicReview,
+  deleteAdminReview,
+  getPublicReviewSummaryByCode,
+  listAdminReviews,
+  updateAdminReview
+} from "../services/reviewService";
 import { getSettings, updateSettings } from "../services/settingsService";
+import {
+  createCatalogOption,
+  deleteCatalogOption,
+  listCatalogOptions,
+  updateCatalogOption
+} from "../services/libraryOptionService";
 import { badRequest, conflict, notFound, unauthorized } from "../utils/http";
 
 const parseBookId = (value: string) => {
@@ -126,6 +142,12 @@ apiRouter.get("/public/summary", async (c) => {
   const db = getDb(c.env);
   const summary = await getPublicCatalogSummary(db);
   return c.json(summary);
+});
+
+apiRouter.get("/public/options", async (c) => {
+  const db = getDb(c.env);
+  const options = await listPublicFilterOptions(db);
+  return c.json(options);
 });
 
 apiRouter.get("/public/books/:shortCode/reviews", async (c) => {
@@ -211,6 +233,8 @@ apiRouter.use("/loan-requests*", requireStaff);
 apiRouter.use("/settings*", requireStaff);
 apiRouter.use("/activity", requireStaff);
 apiRouter.use("/options", requireStaff);
+apiRouter.use("/options/catalog*", requireStaff);
+apiRouter.use("/reviews*", requireStaff);
 apiRouter.use("/export/*", requireStaff);
 
 apiRouter.get("/users", requireStaff, requireAdminRole, async (c) => {
@@ -505,6 +529,114 @@ apiRouter.get("/options", async (c) => {
   const db = getDb(c.env);
   const options = await listLibraryOptions(db);
   return c.json(options);
+});
+
+apiRouter.get("/options/catalog", async (c) => {
+  const db = getDb(c.env);
+  const catalog = await listCatalogOptions(db);
+  return c.json(catalog);
+});
+
+apiRouter.post("/options/catalog/:domain", requireAdminRole, zValidator("json", optionValueSchema), async (c) => {
+  const domainParsed = optionDomainSchema.safeParse(c.req.param("domain"));
+  if (!domainParsed.success) {
+    return badRequest(c, "Invalid option domain");
+  }
+
+  const payload = c.req.valid("json");
+  const db = getDb(c.env);
+
+  try {
+    const item = await createCatalogOption(db, domainParsed.data, payload);
+    return c.json({ item }, 201);
+  } catch (error) {
+    return badRequest(c, error instanceof Error ? error.message : "Failed to add option");
+  }
+});
+
+apiRouter.put(
+  "/options/catalog/:domain/:id",
+  requireAdminRole,
+  zValidator("json", optionValueSchema),
+  async (c) => {
+    const domainParsed = optionDomainSchema.safeParse(c.req.param("domain"));
+    if (!domainParsed.success) {
+      return badRequest(c, "Invalid option domain");
+    }
+
+    const id = parseBookId(c.req.param("id"));
+    if (!id) return badRequest(c, "Invalid option id");
+
+    const payload = c.req.valid("json");
+    const db = getDb(c.env);
+
+    try {
+      const item = await updateCatalogOption(db, domainParsed.data, id, payload);
+      if (!item) {
+        return notFound(c, "Option not found");
+      }
+      return c.json({ item });
+    } catch (error) {
+      return badRequest(c, error instanceof Error ? error.message : "Failed to update option");
+    }
+  }
+);
+
+apiRouter.delete("/options/catalog/:domain/:id", requireAdminRole, async (c) => {
+  const domainParsed = optionDomainSchema.safeParse(c.req.param("domain"));
+  if (!domainParsed.success) {
+    return badRequest(c, "Invalid option domain");
+  }
+
+  const id = parseBookId(c.req.param("id"));
+  if (!id) return badRequest(c, "Invalid option id");
+
+  const db = getDb(c.env);
+  const ok = await deleteCatalogOption(db, domainParsed.data, id);
+  if (!ok) {
+    return notFound(c, "Option not found");
+  }
+
+  return c.json({ ok: true });
+});
+
+apiRouter.get("/reviews", async (c) => {
+  const db = getDb(c.env);
+  const bookId = c.req.query("bookId") ? Number(c.req.query("bookId")) : undefined;
+  const reviews = await listAdminReviews(db, {
+    bookId: Number.isInteger(bookId) ? bookId : undefined,
+    search: c.req.query("search") ?? undefined,
+    limit: c.req.query("limit") ? Number(c.req.query("limit")) : 120
+  });
+
+  return c.json({ reviews });
+});
+
+apiRouter.put("/reviews/:id", zValidator("json", adminReviewUpdateSchema), async (c) => {
+  const id = parseBookId(c.req.param("id"));
+  if (!id) return badRequest(c, "Invalid review id");
+
+  const payload = c.req.valid("json");
+  const db = getDb(c.env);
+  const review = await updateAdminReview(db, id, payload);
+  if (!review) {
+    return notFound(c, "Review not found");
+  }
+
+  return c.json({ review });
+});
+
+apiRouter.delete("/reviews/:id", async (c) => {
+  const id = parseBookId(c.req.param("id"));
+  if (!id) return badRequest(c, "Invalid review id");
+
+  const db = getDb(c.env);
+  const deleted = await deleteAdminReview(db, id);
+  if (!deleted) {
+    return notFound(c, "Review not found");
+  }
+
+  return c.json({ ok: true });
 });
 
 apiRouter.get("/export/books.csv", async (c) => {

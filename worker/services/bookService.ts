@@ -341,7 +341,22 @@ export const listPublicBooks = async (
     whereParts.push(
       or(
         normalizedSearch ? like(books.titleSearch, `%${normalizedSearch}%`) : undefined,
+        like(books.title, plain),
+        like(books.subtitle, plain),
+        like(books.series, plain),
+        like(books.publicNotes, plain),
+        like(books.summary, plain),
         like(books.publicCode, plain),
+        like(books.accessionCode, plain),
+        sql<boolean>`${books.publisherId} IN (
+          SELECT id FROM publishers WHERE name LIKE ${plain}
+        )`,
+        sql<boolean>`${books.categoryId} IN (
+          SELECT id FROM categories WHERE name LIKE ${plain}
+        )`,
+        sql<boolean>`${books.languageId} IN (
+          SELECT id FROM languages WHERE name LIKE ${plain}
+        )`,
         sql<boolean>`${books.id} IN (
           SELECT bp.book_id
           FROM book_people bp
@@ -758,7 +773,7 @@ export const deleteBookPermanently = async (db: DbClient, bookId: number): Promi
 };
 
 export const listLibraryOptions = async (db: DbClient) => {
-  const [categoryRows, languageRows, authorRows, tagRows, locationRows] = await Promise.all([
+  const [categoryRows, languageRows, authorRows, publisherRows, formatRows, conditionRows, tagRows, locationRows] = await Promise.all([
     db.select({ name: categories.name }).from(categories).orderBy(asc(categories.name)),
     db.select({ name: languages.name }).from(languages).orderBy(asc(languages.name)),
     db
@@ -768,6 +783,21 @@ export const listLibraryOptions = async (db: DbClient) => {
         sql<boolean>`${people.id} IN (SELECT DISTINCT person_id FROM book_people WHERE role = 'author')`
       )
       .orderBy(asc(people.name)),
+    db.select({ name: publishers.name }).from(publishers).orderBy(asc(publishers.name)),
+    db
+      .selectDistinct({
+        name: books.format
+      })
+      .from(books)
+      .where(and(eq(books.isArchived, false), sql`${books.format} IS NOT NULL`, sql`TRIM(${books.format}) <> ''`))
+      .orderBy(asc(books.format)),
+    db
+      .selectDistinct({
+        name: books.condition
+      })
+      .from(books)
+      .where(and(eq(books.isArchived, false), sql`${books.condition} IS NOT NULL`, sql`TRIM(${books.condition}) <> ''`))
+      .orderBy(asc(books.condition)),
     db.select({ name: tags.name }).from(tags).orderBy(asc(tags.name)),
     db
       .select({
@@ -782,9 +812,40 @@ export const listLibraryOptions = async (db: DbClient) => {
     categories: categoryRows.map((item) => item.name),
     authors: authorRows.map((item) => item.name),
     languages: languageRows.map((item) => item.name),
+    publishers: publisherRows.map((item) => item.name),
+    formats: formatRows.map((item) => item.name).filter(Boolean) as string[],
+    conditions: conditionRows.map((item) => item.name).filter(Boolean) as string[],
     statuses: ["available", "borrowed", "lost"],
     locations: [...new Set(locationRows.map((row) => row.location).filter((value) => value && value !== "/ / /"))],
     tags: tagRows.map((item) => item.name)
+  };
+};
+
+export const listPublicFilterOptions = async (db: DbClient) => {
+  const [categoryRows, languageRows] = await Promise.all([
+    db
+      .selectDistinct({ name: categories.name })
+      .from(categories)
+      .where(
+        sql<boolean>`${categories.id} IN (
+          SELECT category_id FROM books WHERE is_public = 1 AND is_archived = 0 AND category_id IS NOT NULL
+        )`
+      )
+      .orderBy(asc(categories.name)),
+    db
+      .selectDistinct({ name: languages.name })
+      .from(languages)
+      .where(
+        sql<boolean>`${languages.id} IN (
+          SELECT language_id FROM books WHERE is_public = 1 AND is_archived = 0 AND language_id IS NOT NULL
+        )`
+      )
+      .orderBy(asc(languages.name))
+  ]);
+
+  return {
+    categories: categoryRows.map((row) => row.name).filter(Boolean),
+    languages: languageRows.map((row) => row.name).filter(Boolean)
   };
 };
 

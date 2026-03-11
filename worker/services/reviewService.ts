@@ -1,5 +1,5 @@
 import { and, desc, eq, sql } from "drizzle-orm";
-import type { PublicReviewCreateInput } from "@shared/schemas";
+import type { AdminReviewUpdateInput, PublicReviewCreateInput } from "@shared/schemas";
 import type { BookReview } from "@shared/types";
 import type { DbClient } from "../db/client";
 import { bookReviews, books } from "../db/schema";
@@ -9,6 +9,12 @@ export interface BookReviewSummary {
   averageRating: number;
   ratingCount: number;
   reviews: BookReview[];
+}
+
+export interface AdminReviewItem extends BookReview {
+  publicCode?: string;
+  bookTitle?: string;
+  isHidden: boolean;
 }
 
 const maskPhone = (phone?: string | null): string | undefined => {
@@ -140,4 +146,156 @@ export const getPublicReviewSummaryByCode = async (
   }
 
   return getBookReviewSummary(db, target.id, Boolean(options?.includePrivatePhone));
+};
+
+export const listAdminReviews = async (
+  db: DbClient,
+  filters?: {
+    bookId?: number;
+    search?: string;
+    limit?: number;
+  }
+): Promise<AdminReviewItem[]> => {
+  const whereParts: any[] = [];
+
+  if (filters?.bookId) {
+    whereParts.push(eq(bookReviews.bookId, filters.bookId));
+  }
+
+  if (filters?.search?.trim()) {
+    const q = `%${filters.search.trim()}%`;
+    whereParts.push(
+      sql<boolean>`${bookReviews.reviewerName} LIKE ${q} OR ${bookReviews.comment} LIKE ${q} OR ${bookReviews.reviewerPhone} LIKE ${q}`
+    );
+  }
+
+  const whereClause = whereParts.length ? and(...whereParts) : undefined;
+  const limit = Math.min(250, Math.max(1, filters?.limit ?? 80));
+
+  const rows = await db
+    .select({
+      id: bookReviews.id,
+      bookId: bookReviews.bookId,
+      reviewerName: bookReviews.reviewerName,
+      reviewerPhone: bookReviews.reviewerPhone,
+      rating: bookReviews.rating,
+      comment: bookReviews.comment,
+      isHidden: bookReviews.isHidden,
+      createdAt: bookReviews.createdAt,
+      publicCode: books.publicCode,
+      bookTitle: books.title
+    })
+    .from(bookReviews)
+    .leftJoin(books, eq(bookReviews.bookId, books.id))
+    .where(whereClause)
+    .orderBy(desc(bookReviews.createdAt), desc(bookReviews.id))
+    .limit(limit);
+
+  return rows.map((row) => ({
+    id: row.id,
+    bookId: row.bookId,
+    reviewerName: row.reviewerName,
+    reviewerPhone: row.reviewerPhone,
+    reviewerPhoneMasked: maskPhone(row.reviewerPhone),
+    rating: row.rating,
+    comment: row.comment,
+    createdAt: row.createdAt,
+    publicCode: row.publicCode ?? undefined,
+    bookTitle: row.bookTitle ?? undefined,
+    isHidden: Boolean(row.isHidden)
+  }));
+};
+
+export const updateAdminReview = async (
+  db: DbClient,
+  reviewId: number,
+  input: AdminReviewUpdateInput
+): Promise<AdminReviewItem | null> => {
+  const now = new Date().toISOString();
+
+  await db
+    .update(bookReviews)
+    .set({
+      reviewerName: input.reviewerName.trim(),
+      reviewerPhone: input.reviewerPhone.trim(),
+      rating: input.rating,
+      comment: input.comment.trim(),
+      isHidden: input.isHidden ?? false,
+      updatedAt: now
+    })
+    .where(eq(bookReviews.id, reviewId));
+
+  const rows = await db
+    .select({
+      id: bookReviews.id,
+      bookId: bookReviews.bookId,
+      reviewerName: bookReviews.reviewerName,
+      reviewerPhone: bookReviews.reviewerPhone,
+      rating: bookReviews.rating,
+      comment: bookReviews.comment,
+      isHidden: bookReviews.isHidden,
+      createdAt: bookReviews.createdAt,
+      publicCode: books.publicCode,
+      bookTitle: books.title
+    })
+    .from(bookReviews)
+    .leftJoin(books, eq(bookReviews.bookId, books.id))
+    .where(eq(bookReviews.id, reviewId))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) return null;
+
+  await logActivity(db, {
+    entityType: "review",
+    entityId: `${row.id}`,
+    action: "review_updated",
+    message: `Review updated (${row.id})`,
+    payload: {
+      bookId: row.bookId,
+      rating: row.rating
+    }
+  });
+
+  return {
+    id: row.id,
+    bookId: row.bookId,
+    reviewerName: row.reviewerName,
+    reviewerPhone: row.reviewerPhone,
+    reviewerPhoneMasked: maskPhone(row.reviewerPhone),
+    rating: row.rating,
+    comment: row.comment,
+    createdAt: row.createdAt,
+    publicCode: row.publicCode ?? undefined,
+    bookTitle: row.bookTitle ?? undefined,
+    isHidden: Boolean(row.isHidden)
+  };
+};
+
+export const deleteAdminReview = async (db: DbClient, reviewId: number): Promise<boolean> => {
+  const rows = await db
+    .select({
+      id: bookReviews.id,
+      bookId: bookReviews.bookId
+    })
+    .from(bookReviews)
+    .where(eq(bookReviews.id, reviewId))
+    .limit(1);
+
+  const existing = rows[0];
+  if (!existing) return false;
+
+  await db.delete(bookReviews).where(eq(bookReviews.id, reviewId));
+
+  await logActivity(db, {
+    entityType: "review",
+    entityId: `${reviewId}`,
+    action: "review_deleted",
+    message: `Review deleted (${reviewId})`,
+    payload: {
+      bookId: existing.bookId
+    }
+  });
+
+  return true;
 };

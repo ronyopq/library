@@ -6,6 +6,7 @@ import { resolveCoverImageUrl } from "@/lib/cover";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
 import { LoadingState } from "@/components/common/LoadingState";
+import { useDebounce } from "@/hooks/useDebounce";
 
 interface PublicBooksResponse {
   items: Array<{
@@ -37,31 +38,50 @@ interface PublicSummary {
 export const PublicCatalogPage = () => {
   const [search, setSearch] = useState("");
   const [location, setLocation] = useState("");
+  const [category, setCategory] = useState("");
+  const debouncedSearch = useDebounce(search, 280);
+  const debouncedLocation = useDebounce(location, 280);
 
   const summaryQuery = useQuery({
     queryKey: ["public-summary"],
     queryFn: () => apiRequest<PublicSummary>("/api/public/summary")
   });
 
+  const optionsQuery = useQuery({
+    queryKey: ["public-options"],
+    queryFn: () => apiRequest<{ categories: string[]; languages: string[] }>("/api/public/options")
+  });
+
   const booksQuery = useQuery({
-    queryKey: ["public-books", search, location],
+    queryKey: ["public-books", debouncedSearch, debouncedLocation, category],
     queryFn: () =>
       apiRequest<PublicBooksResponse>("/api/public/books", {
         params: {
-          search,
-          location,
+          search: debouncedSearch,
+          location: debouncedLocation,
+          category,
           limit: 200,
           offset: 0
         }
       })
   });
 
-  if (summaryQuery.isLoading || booksQuery.isLoading) return <LoadingState label="Loading public catalog..." />;
-  if (summaryQuery.isError || booksQuery.isError) {
-    return <ErrorState message={(summaryQuery.error as Error)?.message || (booksQuery.error as Error)?.message || "Failed to load"} />;
+  if (summaryQuery.isLoading || booksQuery.isLoading || optionsQuery.isLoading) return <LoadingState label="Loading public catalog..." />;
+  if (summaryQuery.isError || booksQuery.isError || optionsQuery.isError) {
+    return (
+      <ErrorState
+        message={
+          (summaryQuery.error as Error)?.message ||
+          (booksQuery.error as Error)?.message ||
+          (optionsQuery.error as Error)?.message ||
+          "Failed to load"
+        }
+      />
+    );
   }
 
   const books = booksQuery.data?.items ?? [];
+  const publicCategories = optionsQuery.data?.categories ?? [];
 
   return (
     <div className="space-y-5">
@@ -71,7 +91,7 @@ export const PublicCatalogPage = () => {
           Public books available: <strong>{summaryQuery.data?.totalPublicBooks ?? 0}</strong>
         </p>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -84,6 +104,18 @@ export const PublicCatalogPage = () => {
             placeholder="Search by shelf / rack / cabinet"
             className="w-full rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm"
           />
+          <select
+            value={category}
+            onChange={(event) => setCategory(event.target.value)}
+            className="w-full rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm"
+          >
+            <option value="">All categories</option>
+            {publicCategories.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
         </div>
       </section>
 

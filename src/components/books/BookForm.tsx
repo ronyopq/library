@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import type { BookPayloadInput } from "@shared/schemas";
-import type { DuplicateMatch, IsbnLookupResult, OcrExtractionResult } from "@shared/types";
+import type { DuplicateMatch, IsbnLookupResult, LibraryOptions, OcrExtractionResult } from "@shared/types";
 import { apiRequest } from "@/lib/api";
 import { clearDraft, loadDraft, saveDraft } from "@/lib/draftStore";
 import { resolveCoverImageUrl } from "@/lib/cover";
@@ -57,6 +57,7 @@ interface FormValues {
 interface BookFormProps {
   bookId?: number;
   initialData?: any;
+  options?: LibraryOptions;
   draftKey: string;
   onSaved: (id: number) => void;
 }
@@ -178,7 +179,7 @@ const mapInitialToForm = (initialData?: any): FormValues => {
 const inputClass =
   "w-full rounded-xl border border-app-border bg-white px-3 py-2 text-sm text-app-text placeholder:text-app-muted focus:border-app-primary focus:outline-none";
 
-export const BookForm = ({ bookId, initialData, draftKey, onSaved }: BookFormProps) => {
+export const BookForm = ({ bookId, initialData, options, draftKey, onSaved }: BookFormProps) => {
   const [coverPreview, setCoverPreview] = useState<string | undefined>(resolveCoverImageUrl(initialData?.coverImageKey));
   const [coverImageKey, setCoverImageKey] = useState<string | undefined>(initialData?.coverImageKey);
   const [cropSource, setCropSource] = useState<string | null>(null);
@@ -191,12 +192,38 @@ export const BookForm = ({ bookId, initialData, draftKey, onSaved }: BookFormPro
   const [metadataSourceDetails, setMetadataSourceDetails] = useState<Record<string, unknown> | undefined>(
     initialData?.metadataSourceDetails
   );
+  const [customMode, setCustomMode] = useState({
+    publisherName: false,
+    categoryName: false,
+    languageName: false,
+    format: false,
+    condition: false
+  });
 
   const form = useForm<FormValues>({
     defaultValues: mapInitialToForm(initialData)
   });
 
   const values = form.watch();
+
+  const isCustomValue = (value: string, list: string[] | undefined) => Boolean(value && !(list ?? []).includes(value));
+
+  const setCustomField = (
+    field: "publisherName" | "categoryName" | "languageName" | "format" | "condition",
+    selectedValue: string,
+    list: string[] | undefined
+  ) => {
+    if (selectedValue === "__custom__") {
+      setCustomMode((prev) => ({ ...prev, [field]: true }));
+      if ((list ?? []).includes(form.getValues(field))) {
+        form.setValue(field, "");
+      }
+      return;
+    }
+
+    setCustomMode((prev) => ({ ...prev, [field]: false }));
+    form.setValue(field, selectedValue);
+  };
 
   useEffect(() => {
     const drafted = loadDraft<Partial<FormValues>>(draftKey);
@@ -215,6 +242,17 @@ export const BookForm = ({ bookId, initialData, draftKey, onSaved }: BookFormPro
     }, 450);
     return () => window.clearTimeout(timeout);
   }, [values, draftKey]);
+
+  useEffect(() => {
+    setCustomMode({
+      publisherName: isCustomValue(form.getValues("publisherName"), options?.publishers),
+      categoryName: isCustomValue(form.getValues("categoryName"), options?.categories),
+      languageName: isCustomValue(form.getValues("languageName"), options?.languages),
+      format: isCustomValue(form.getValues("format"), options?.formats),
+      condition: isCustomValue(form.getValues("condition"), options?.conditions)
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [options]);
 
   const buildPayload = (data: FormValues, forceSave = false): BookPayloadInput => {
     const contributors = [
@@ -412,6 +450,22 @@ export const BookForm = ({ bookId, initialData, draftKey, onSaved }: BookFormPro
 
   const sectionTitleClass = "mb-2 font-heading text-base text-app-text";
 
+  const publisherList = options?.publishers ?? [];
+  const categoryList = options?.categories ?? [];
+  const languageList = options?.languages ?? [];
+  const formatList = options?.formats ?? [];
+  const conditionList = options?.conditions ?? [];
+
+  const publisherSelectValue =
+    customMode.publisherName || isCustomValue(values.publisherName, publisherList) ? "__custom__" : values.publisherName;
+  const categorySelectValue =
+    customMode.categoryName || isCustomValue(values.categoryName, categoryList) ? "__custom__" : values.categoryName;
+  const languageSelectValue =
+    customMode.languageName || isCustomValue(values.languageName, languageList) ? "__custom__" : values.languageName;
+  const formatSelectValue = customMode.format || isCustomValue(values.format, formatList) ? "__custom__" : values.format;
+  const conditionSelectValue =
+    customMode.condition || isCustomValue(values.condition, conditionList) ? "__custom__" : values.condition;
+
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       {duplicates.length > 0 ? <DuplicateWarning duplicates={duplicates} onForceSave={handleForceSave} /> : null}
@@ -464,9 +518,57 @@ export const BookForm = ({ bookId, initialData, draftKey, onSaved }: BookFormPro
           <input {...form.register("title")} placeholder="Title (recommended)" className={inputClass} />
           <input {...form.register("subtitle")} placeholder="Subtitle" className={inputClass} />
           <input {...form.register("authorNames")} placeholder="Authors (comma separated)" className={inputClass} />
-          <input {...form.register("publisherName")} placeholder="Publisher" className={inputClass} />
-          <input {...form.register("categoryName")} placeholder="Category" className={inputClass} />
-          <input {...form.register("languageName")} placeholder="Language" className={inputClass} />
+          <select
+            value={publisherSelectValue}
+            onChange={(event) => setCustomField("publisherName", event.target.value, publisherList)}
+            className={inputClass}
+          >
+            <option value="">Select Publisher</option>
+            {publisherList.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+            <option value="__custom__">Custom Publisher...</option>
+          </select>
+          {publisherSelectValue === "__custom__" ? (
+            <input {...form.register("publisherName")} placeholder="Custom Publisher" className={inputClass} />
+          ) : null}
+
+          <select
+            value={categorySelectValue}
+            onChange={(event) => setCustomField("categoryName", event.target.value, categoryList)}
+            className={inputClass}
+          >
+            <option value="">Select Category</option>
+            {categoryList.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+            <option value="__custom__">Custom Category...</option>
+          </select>
+          {categorySelectValue === "__custom__" ? (
+            <input {...form.register("categoryName")} placeholder="Custom Category" className={inputClass} />
+          ) : null}
+
+          <select
+            value={languageSelectValue}
+            onChange={(event) => setCustomField("languageName", event.target.value, languageList)}
+            className={inputClass}
+          >
+            <option value="">Select Language</option>
+            {languageList.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+            <option value="__custom__">Custom Language...</option>
+          </select>
+          {languageSelectValue === "__custom__" ? (
+            <input {...form.register("languageName")} placeholder="Custom Language" className={inputClass} />
+          ) : null}
+
           <input {...form.register("publicationYear")} placeholder="Publication Year" className={inputClass} />
           <input {...form.register("pageCount")} placeholder="Page Count" className={inputClass} />
           <input {...form.register("copyCount")} placeholder="Number of Copies" className={inputClass} />
@@ -474,8 +576,41 @@ export const BookForm = ({ bookId, initialData, draftKey, onSaved }: BookFormPro
           <input {...form.register("printingNumber")} placeholder="Printing Number" className={inputClass} />
           <input {...form.register("series")} placeholder="Series" className={inputClass} />
           <input {...form.register("volume")} placeholder="Volume" className={inputClass} />
-          <input {...form.register("format")} placeholder="Format (hardcover/paperback)" className={inputClass} />
-          <input {...form.register("condition")} placeholder="Condition" className={inputClass} />
+
+          <select
+            value={formatSelectValue}
+            onChange={(event) => setCustomField("format", event.target.value, formatList)}
+            className={inputClass}
+          >
+            <option value="">Select Format</option>
+            {formatList.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+            <option value="__custom__">Custom Format...</option>
+          </select>
+          {formatSelectValue === "__custom__" ? (
+            <input {...form.register("format")} placeholder="Custom Format (e.g. Hardcover)" className={inputClass} />
+          ) : null}
+
+          <select
+            value={conditionSelectValue}
+            onChange={(event) => setCustomField("condition", event.target.value, conditionList)}
+            className={inputClass}
+          >
+            <option value="">Select Condition</option>
+            {conditionList.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+            <option value="__custom__">Custom Condition...</option>
+          </select>
+          {conditionSelectValue === "__custom__" ? (
+            <input {...form.register("condition")} placeholder="Custom Condition" className={inputClass} />
+          ) : null}
+
           <input {...form.register("editorNames")} placeholder="Editors (comma separated)" className={inputClass} />
           <input {...form.register("translatorNames")} placeholder="Translators (comma separated)" className={inputClass} />
           <input {...form.register("illustratorNames")} placeholder="Illustrators (comma separated)" className={inputClass} />

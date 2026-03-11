@@ -11,6 +11,7 @@ import { LibraryPage } from "@/pages/LibraryPage";
 import { LoansPage } from "@/pages/LoansPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { PrintLabelsPage } from "@/pages/PrintLabelsPage";
+import { ReviewsPage } from "@/pages/ReviewsPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { UsersPage } from "@/pages/UsersPage";
 import { AdminLoginPage } from "@/pages/admin/AdminLoginPage";
@@ -53,6 +54,7 @@ export default function App() {
           <Route path="/admin/loans" element={<LoansPage />} />
           <Route path="/admin/labels" element={<PrintLabelsPage />} />
           <Route path="/admin/activity" element={<ActivityPage />} />
+          <Route path="/admin/reviews" element={<ReviewsPage />} />
           <Route path="/admin/settings" element={<SettingsPage />} />
           <Route path="/admin/archived" element={<ArchivedPage />} />
           <Route element={<AdminOnlyGuard />}>

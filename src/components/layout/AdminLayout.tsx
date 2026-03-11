@@ -1,4 +1,4 @@
-import { BookOpenText, Boxes, LayoutDashboard, LogOut, Printer, ScrollText, Settings, ShieldCheck, UsersRound } from "lucide-react";
+import { BookOpenText, Boxes, LayoutDashboard, LogOut, MessageSquareText, Printer, ScrollText, Settings, ShieldCheck, UsersRound } from "lucide-react";
 import { useMemo, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { clearAdminSession, getStoredAuthUser, isCurrentUserAdmin } from "@/lib/adminAuth";
@@ -16,6 +16,7 @@ export const AdminLayout = () => {
       { to: "/admin/library", label: "Library", icon: BookOpenText },
       { to: "/admin/books/new", label: "Add Book", icon: Boxes },
       { to: "/admin/loans", label: "Loans", icon: UsersRound },
+      { to: "/admin/reviews", label: "Reviews", icon: MessageSquareText },
       { to: "/admin/labels", label: "Print Labels", icon: Printer },
       { to: "/admin/activity", label: "Activity", icon: ScrollText },
       { to: "/admin/settings", label: "Settings", icon: Settings },

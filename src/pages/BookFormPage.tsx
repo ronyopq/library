@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import type { LibraryOptions } from "@shared/types";
 import { useNavigate, useParams } from "react-router-dom";
 import { BookForm } from "@/components/books/BookForm";
 import { ErrorState } from "@/components/common/ErrorState";
@@ -18,8 +19,16 @@ export const BookFormPage = () => {
     enabled: Boolean(isEdit)
   });
 
-  if (isEdit && query.isLoading) return <LoadingState />;
+  const optionsQuery = useQuery({
+    queryKey: ["library-options", "book-form"],
+    queryFn: () => apiRequest<LibraryOptions>("/api/options")
+  });
+
+  if ((isEdit && query.isLoading) || optionsQuery.isLoading) return <LoadingState />;
   if (isEdit && query.isError) return <ErrorState message={(query.error as Error).message} retry={() => query.refetch()} />;
+  if (optionsQuery.isError) {
+    return <ErrorState message={(optionsQuery.error as Error).message} retry={() => optionsQuery.refetch()} />;
+  }
 
   const initialData = isEdit ? query.data : undefined;
 
@@ -33,6 +42,7 @@ export const BookFormPage = () => {
       <BookForm
         bookId={bookId}
         initialData={initialData}
+        options={optionsQuery.data}
         draftKey={getDraftKey(bookId)}
         onSaved={(id) => navigate(`/admin/books/${id}`)}
       />
