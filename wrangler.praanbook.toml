@@ -1,0 +1,22 @@
+name = "praanbook-worker"
+main = "worker/index.ts"
+compatibility_date = "2026-03-10"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "praanbook-db"
+database_id = "229e5fd6-7c26-4861-818b-55c1a87758de"
+migrations_dir = "drizzle"
+
+[[kv_namespaces]]
+binding = "LIBRARY_KV"
+id = "2c5cb6126b8b434a9ce5429661061b06"
+preview_id = "2c5cb6126b8b434a9ce5429661061b06"
+
+[vars]
+APP_ENV = "production"
+PUBLIC_BASE_URL = "https://praanbook.pages.dev"
