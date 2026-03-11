@@ -19,4 +19,4 @@ preview_id = "19cb9d4bc3b14bf6bbc59e4f56481fb8"
 
 [vars]
 APP_ENV = "production"
-PUBLIC_BASE_URL = "https://library-6ny.pages.dev"
+PUBLIC_BASE_URL = "https://ronybook.pages.dev"

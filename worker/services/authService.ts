@@ -19,18 +19,11 @@ const defaultStaffSeeds: Array<{
   password: string;
 }> = [
   {
-    username: "admin",
-    fullName: "Primary Admin",
-    phone: "01700000001",
+    username: "ronysiddiqi",
+    fullName: "Rony Siddiqi",
+    phone: "",
     role: "admin",
-    password: "Admin@1234"
-  },
-  {
-    username: "librarian",
-    fullName: "Library Staff",
-    phone: "01700000002",
-    role: "librarian",
-    password: "Lib@1234"
+    password: "120174"
   }
 ];
 

@@ -39,8 +39,8 @@ INSERT INTO library_settings (
   updated_at
 ) VALUES (
   1,
-  'PRAAN - Book Log',
-  'dd-MM-yyyy',
+  'Personal Library',
+  'yyyy-MM-dd',
   'selected',
   1,
   1,
@@ -72,4 +72,3 @@ WHERE name IN (
 );
 
 PRAGMA foreign_keys = ON;
-

@@ -6,8 +6,8 @@ import { apiRequest } from "@/lib/api";
 
 export const AdminLoginPage = () => {
   const navigate = useNavigate();
-  const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("Admin@1234");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
