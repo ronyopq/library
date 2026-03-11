@@ -1,6 +1,7 @@
 name = "personal-library"
 main = "worker/index.ts"
 compatibility_date = "2026-03-10"
+pages_build_output_dir = "dist"
 
 [assets]
 directory = "./dist"
