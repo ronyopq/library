@@ -6,6 +6,7 @@ import { ActivityPage } from "@/pages/ActivityPage";
 import { ArchivedPage } from "@/pages/ArchivedPage";
 import { BookDetailsPage } from "@/pages/BookDetailsPage";
 import { BookFormPage } from "@/pages/BookFormPage";
+import { BorrowTimelinePage } from "@/pages/BorrowTimelinePage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { LibraryPage } from "@/pages/LibraryPage";
 import { LoansPage } from "@/pages/LoansPage";
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="/admin/dashboard" element={<DashboardPage />} />
           <Route path="/admin/library" element={<LibraryPage />} />
+          <Route path="/admin/books" element={<BorrowTimelinePage />} />
           <Route path="/admin/books/new" element={<BookFormPage />} />
           <Route path="/admin/books/:id/edit" element={<BookFormPage />} />
           <Route path="/admin/books/:id" element={<BookDetailsPage />} />

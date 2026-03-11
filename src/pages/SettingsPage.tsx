@@ -79,7 +79,15 @@ export const SettingsPage = () => {
     mutationFn: (payload: SettingsForm) =>
       apiRequest<{ settings: SettingsForm }>("/api/settings", {
         method: "PUT",
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          ...payload,
+          publicBaseUrl: payload.publicBaseUrl?.trim() || undefined,
+          contactName: payload.contactName?.trim() || undefined,
+          contactPhone: payload.contactPhone?.trim() || undefined,
+          contactEmail: payload.contactEmail?.trim() || undefined,
+          defaultLanguage: payload.defaultLanguage?.trim() || undefined,
+          defaultCategory: payload.defaultCategory?.trim() || undefined
+        })
       }),
     onSuccess: (result) => {
       setForm(result.settings);

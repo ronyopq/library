@@ -173,7 +173,10 @@ export const settingsSchema = z.object({
   dateFormat: z.string().trim().min(4).max(40).default("yyyy-MM-dd"),
   contactName: optionalText,
   contactPhone: optionalText,
-  contactEmail: z.string().email().optional(),
+  contactEmail: z
+    .union([z.string().email(), z.literal("")])
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : undefined)),
   publicVisibilityMode: z.enum(["selected", "all", "off"]).default("selected"),
   defaultLanguage: optionalText,
   defaultCategory: optionalText,

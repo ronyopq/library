@@ -244,6 +244,8 @@ export const LoansPage = () => {
   const requests = requestsQuery.data?.requests ?? [];
   const statusFilter = normalizeStatusFilter(searchParams.get("status"));
   const focusRequestId = searchParams.get("focusRequest") ? Number(searchParams.get("focusRequest")) : undefined;
+  const prefillBookId = searchParams.get("bookId");
+  const prefillCopyId = searchParams.get("copyId");
 
   const filteredLoans = loans.filter((loan) => {
     if (!statusFilter) return true;
@@ -315,6 +317,27 @@ export const LoansPage = () => {
       node.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }, [focusRequestId, requests.length]);
+
+  useEffect(() => {
+    if (!prefillBookId) return;
+    const target = books.find((book) => String(book.id) === prefillBookId);
+    if (!target) return;
+
+    setForm((prev) => {
+      if (prev.bookId === prefillBookId && (!prefillCopyId || prev.bookCopyId === prefillCopyId)) {
+        return prev;
+      }
+
+      const selectedCopy =
+        prefillCopyId && target.copies?.some((copy) => String(copy.id) === prefillCopyId) ? prefillCopyId : "";
+
+      return {
+        ...prev,
+        bookId: prefillBookId,
+        bookCopyId: selectedCopy
+      };
+    });
+  }, [books, prefillBookId, prefillCopyId]);
 
   return (
     <div className="space-y-4">

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { MessageSquareText } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { BarcodeSvg } from "@/components/common/BarcodeSvg";
@@ -46,6 +47,18 @@ interface BookDetails {
     borrowedAt?: string;
     expectedReturnAt?: string;
   }>;
+  loanHistory?: Array<{
+    id: number;
+    status: string;
+    borrowerName: string;
+    borrowerDesignation?: string;
+    borrowerPhone?: string;
+    borrowedAt: string;
+    expectedReturnAt?: string;
+    returnedAt?: string;
+    note?: string;
+    copyCode?: string;
+  }>;
 }
 
 const statusBadgeClass = (status?: string) =>
@@ -54,6 +67,15 @@ const statusBadgeClass = (status?: string) =>
     : status === "lost"
       ? "bg-rose-100 text-rose-700"
       : "bg-emerald-100 text-emerald-700";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const getReadingDays = (borrowedAt?: string, returnedAt?: string): number | null => {
+  if (!borrowedAt) return null;
+  const start = new Date(borrowedAt).getTime();
+  const end = returnedAt ? new Date(returnedAt).getTime() : Date.now();
+  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return null;
+  return Math.max(1, Math.ceil((end - start) / DAY_MS));
+};
 
 export const BookDetailsPage = () => {
   const params = useParams();
@@ -92,6 +114,7 @@ export const BookDetailsPage = () => {
   const qrValue = `${window.location.origin}/b/${book.publicCode}`;
   const authors = book.contributors?.filter((item) => item.role === "author").map((item) => item.name).join(", ");
   const copies = book.copies ?? [];
+  const loanHistory = book.loanHistory ?? [];
   const primaryCopyCode = copies[0]?.copyCode ?? `${book.accessionCode}-C01`;
 
   return (
@@ -242,6 +265,50 @@ export const BookDetailsPage = () => {
                   <div className="w-[220px] max-w-full overflow-hidden rounded border border-app-border p-2">
                     <BarcodeSvg value={copy.barcodeValue || copy.copyCode} height={38} width={1.1} />
                   </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
+        <h3 className="font-heading text-base">Borrow Timeline (All Previous Records)</h3>
+        {loanHistory.length === 0 ? (
+          <p className="mt-2 text-sm text-app-muted">No borrow records for this book yet.</p>
+        ) : (
+          <div className="mt-3 space-y-3">
+            {loanHistory.map((entry) => (
+              <article key={entry.id} className="rounded-xl border border-app-border p-3">
+                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                  <p>
+                    <strong>Copy No:</strong> {entry.copyCode || "-"}
+                  </p>
+                  <p>
+                    <strong>Borrower:</strong> {entry.borrowerName}
+                  </p>
+                  <p>
+                    <strong>Designation:</strong> {entry.borrowerDesignation || "-"}
+                  </p>
+                  <p>
+                    <strong>Mobile:</strong> {entry.borrowerPhone || "-"}
+                  </p>
+                  <p>
+                    <strong>Borrow Date:</strong> {formatDate(entry.borrowedAt)}
+                  </p>
+                  <p>
+                    <strong>Return Date:</strong> {formatDate(entry.returnedAt)}
+                  </p>
+                  <p>
+                    <strong>Total Reading Day:</strong> {getReadingDays(entry.borrowedAt, entry.returnedAt) ?? "-"}
+                  </p>
+                  <p>
+                    <strong>Status:</strong> {entry.status}
+                  </p>
+                </div>
+                <div className="mt-2 flex items-center gap-2 text-sm text-app-muted">
+                  <MessageSquareText className="h-4 w-4" />
+                  <span>{entry.note || "No comment"}</span>
                 </div>
               </article>
             ))}

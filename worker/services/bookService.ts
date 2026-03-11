@@ -4,11 +4,13 @@ import type { BookListItem } from "@shared/types";
 import type { DbClient } from "../db/client";
 import {
   acquisitions,
+  bookCopies,
   bookPeople,
   books,
   bookTags,
   categories,
   languages,
+  loans,
   people,
   publishers,
   tags
@@ -524,6 +526,24 @@ export const getBookById = async (db: DbClient, bookId: number) => {
     .where(eq(bookTags.bookId, bookId));
 
   const acquisitionRows = await db.select().from(acquisitions).where(eq(acquisitions.bookId, bookId)).limit(1);
+  const loanHistoryRows = await db
+    .select({
+      id: loans.id,
+      status: loans.status,
+      borrowerName: loans.borrowerName,
+      borrowerDesignation: loans.borrowerDesignation,
+      borrowerPhone: loans.borrowerPhone,
+      borrowedAt: loans.borrowedAt,
+      expectedReturnAt: loans.expectedReturnAt,
+      returnedAt: loans.returnedAt,
+      note: loans.note,
+      copyCode: bookCopies.copyCode
+    })
+    .from(loans)
+    .leftJoin(bookCopies, eq(loans.bookCopyId, bookCopies.id))
+    .where(eq(loans.bookId, bookId))
+    .orderBy(desc(loans.borrowedAt), desc(loans.id));
+
   const [copies, copyMap] = await Promise.all([
     listBookCopies(db, bookId, true),
     getCopyCountsForBookIds(db, [bookId])
@@ -552,6 +572,18 @@ export const getBookById = async (db: DbClient, bookId: number) => {
     lostCopyCount: counts?.lostCopyCount ?? copies.filter((copy) => copy.status === "lost").length,
     primaryCopyCode: counts?.primaryCopyCode,
     copies,
+    loanHistory: loanHistoryRows.map((loan) => ({
+      id: loan.id,
+      status: loan.status,
+      borrowerName: loan.borrowerName,
+      borrowerDesignation: loan.borrowerDesignation ?? undefined,
+      borrowerPhone: loan.borrowerPhone ?? undefined,
+      borrowedAt: loan.borrowedAt,
+      expectedReturnAt: loan.expectedReturnAt ?? undefined,
+      returnedAt: loan.returnedAt ?? undefined,
+      note: loan.note ?? undefined,
+      copyCode: loan.copyCode ?? undefined
+    })),
     metadataSourceDetails: parseJsonSafely<Record<string, unknown>>(book.metadataSourceDetails)
   };
 };
