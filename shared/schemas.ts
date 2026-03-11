@@ -128,6 +128,9 @@ export const loanCreateSchema = z.object({
   bookId: z.number().int().positive(),
   bookCopyId: z.number().int().positive().optional(),
   borrowerName: z.string().trim().min(1).max(140),
+  borrowerOrganization: optionalText,
+  borrowerDesignation: optionalText,
+  borrowerAddress: z.string().trim().max(800).optional(),
   borrowerPhone: optionalText,
   borrowerEmail: z.string().email().optional(),
   borrowedAt: optionalText,
@@ -138,8 +141,12 @@ export const loanCreateSchema = z.object({
 
 export const publicBorrowRequestCreateSchema = z.object({
   requesterName: z.string().trim().min(2).max(140),
+  requesterOrganization: optionalText,
+  requesterDesignation: optionalText,
+  requesterAddress: z.string().trim().max(800).optional(),
   requesterPhone: z.string().trim().min(5).max(30),
   requesterEmail: z.string().email().optional(),
+  borrowedAt: optionalText,
   expectedReturnAt: optionalText,
   requestedCopyId: z.number().int().positive().optional(),
   note: z.string().trim().max(1000).optional()

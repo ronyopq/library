@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, like, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import type { BookFilterInput, BookPayloadInput } from "@shared/schemas";
 import type { BookListItem } from "@shared/types";
 import type { DbClient } from "../db/client";
@@ -41,7 +41,8 @@ const mapListRow = (
     borrowedCopyCount: number;
     lostCopyCount: number;
     primaryCopyCode?: string;
-  }
+  },
+  authors?: string[]
 ): BookListItem => ({
   id: row.id,
   accessionCode: row.accessionCode,
@@ -49,7 +50,7 @@ const mapListRow = (
   primaryCopyCode: copyInfo?.primaryCopyCode,
   title: row.title ?? undefined,
   subtitle: row.subtitle ?? undefined,
-  authors: splitCommaList(row.authors),
+  authors: authors ?? splitCommaList(row.authors),
   category: row.categoryName ?? undefined,
   language: row.languageName ?? undefined,
   publicationYear: row.publicationYear ?? undefined,
@@ -133,11 +134,31 @@ const upsertAcquisition = async (db: DbClient, bookId: number, payload: BookPayl
 
 const categoryDistributionQuery = sql<string>`COALESCE((SELECT c.name FROM categories c WHERE c.id = ${books.categoryId}), '')`;
 const languageDistributionQuery = sql<string>`COALESCE((SELECT l.name FROM languages l WHERE l.id = ${books.languageId}), '')`;
-const authorQuery = sql<string>`COALESCE((SELECT group_concat(pe.name, ', ')
-  FROM book_people bp
-  JOIN people pe ON pe.id = bp.person_id
-  WHERE bp.book_id = ${books.id} AND bp.role = 'author'
-  ORDER BY bp.sort_order), '')`;
+
+const getAuthorsByBookIds = async (db: DbClient, bookIds: number[]): Promise<Map<number, string[]>> => {
+  const output = new Map<number, string[]>();
+  if (bookIds.length === 0) {
+    return output;
+  }
+
+  const rows = await db
+    .select({
+      bookId: bookPeople.bookId,
+      authorName: people.name
+    })
+    .from(bookPeople)
+    .innerJoin(people, eq(bookPeople.personId, people.id))
+    .where(and(inArray(bookPeople.bookId, bookIds), eq(bookPeople.role, "author")))
+    .orderBy(asc(bookPeople.bookId), asc(bookPeople.sortOrder), asc(people.name));
+
+  for (const row of rows) {
+    const list = output.get(row.bookId) ?? [];
+    list.push(row.authorName);
+    output.set(row.bookId, list);
+  }
+
+  return output;
+};
 
 export const listBooks = async (db: DbClient, filters: BookFilterInput): Promise<{ items: BookListItem[]; total: number }> => {
   const whereParts: any[] = [];
@@ -249,8 +270,7 @@ export const listBooks = async (db: DbClient, filters: BookFilterInput): Promise
       positionNote: books.positionNote,
       dateAdded: books.dateAdded,
       categoryName: categoryDistributionQuery,
-      languageName: languageDistributionQuery,
-      authors: authorQuery
+      languageName: languageDistributionQuery
     })
     .from(books)
     .where(whereClause)
@@ -265,6 +285,7 @@ export const listBooks = async (db: DbClient, filters: BookFilterInput): Promise
 
   const bookIds = rows.map((row) => row.id);
   const copyMap = await getCopyCountsForBookIds(db, bookIds);
+  const authorMap = await getAuthorsByBookIds(db, bookIds);
   const copiesByBookId = new Map<number, Awaited<ReturnType<typeof listBookCopies>>>();
 
   if (filters.includeCopies) {
@@ -282,7 +303,7 @@ export const listBooks = async (db: DbClient, filters: BookFilterInput): Promise
 
   return {
     items: rows.map((row) => ({
-      ...mapListRow(row, copyMap.get(row.id)),
+      ...mapListRow(row, copyMap.get(row.id), authorMap.get(row.id) ?? []),
       copies: copiesByBookId.get(row.id)
     })),
     total: Number(countRows[0]?.count ?? 0)
@@ -397,8 +418,7 @@ export const listPublicBooks = async (
       positionNote: books.positionNote,
       dateAdded: books.dateAdded,
       categoryName: categoryDistributionQuery,
-      languageName: languageDistributionQuery,
-      authors: authorQuery
+      languageName: languageDistributionQuery
     })
     .from(books)
     .where(whereClause)
@@ -411,13 +431,11 @@ export const listPublicBooks = async (
     .from(books)
     .where(whereClause);
 
-  const copyMap = await getCopyCountsForBookIds(
-    db,
-    rows.map((row) => row.id)
-  );
+  const bookIds = rows.map((row) => row.id);
+  const [copyMap, authorMap] = await Promise.all([getCopyCountsForBookIds(db, bookIds), getAuthorsByBookIds(db, bookIds)]);
 
   return {
-    items: rows.map((row) => mapListRow(row, copyMap.get(row.id))),
+    items: rows.map((row) => mapListRow(row, copyMap.get(row.id), authorMap.get(row.id) ?? [])),
     total: Number(countRows[0]?.count ?? 0)
   };
 };
@@ -596,6 +614,8 @@ export const createBook = async (db: DbClient, payload: BookPayloadInput) => {
     .returning({
       id: books.id,
       accessionCode: books.accessionCode,
+      accessionYear: books.accessionYear,
+      accessionSerial: books.accessionSerial,
       publicCode: books.publicCode
     });
 
@@ -603,7 +623,13 @@ export const createBook = async (db: DbClient, payload: BookPayloadInput) => {
 
   await insertRelations(db, createdBook.id, payload);
   await upsertAcquisition(db, createdBook.id, payload);
-  await createBookCopies(db, createdBook.id, createdBook.accessionCode, payload.copyCount ?? 1);
+  await createBookCopies(
+    db,
+    createdBook.id,
+    createdBook.accessionYear,
+    createdBook.accessionSerial,
+    payload.copyCount ?? 1
+  );
   await syncBookStatusFromCopies(db, createdBook.id);
 
   await logActivity(db, {
@@ -676,15 +702,17 @@ export const updateBook = async (db: DbClient, bookId: number, payload: BookPayl
   if (payload.copyCount && payload.copyCount > 0) {
     const rows = await db
       .select({
-        accessionCode: books.accessionCode
+        accessionYear: books.accessionYear,
+        accessionSerial: books.accessionSerial
       })
       .from(books)
       .where(eq(books.id, bookId))
       .limit(1);
 
-    const accessionCode = rows[0]?.accessionCode;
-    if (accessionCode) {
-      await createBookCopies(db, bookId, accessionCode, payload.copyCount);
+    const accessionYear = rows[0]?.accessionYear;
+    const accessionSerial = rows[0]?.accessionSerial;
+    if (accessionYear && accessionSerial) {
+      await createBookCopies(db, bookId, accessionYear, accessionSerial, payload.copyCount);
     }
   }
 
@@ -875,7 +903,6 @@ export const getPublicBookByCode = async (
       languageName: languageDistributionQuery,
       categoryName: categoryDistributionQuery,
       publisherName: sql<string>`COALESCE((SELECT p.name FROM publishers p WHERE p.id = ${books.publisherId}), '')`,
-      authors: authorQuery,
       isPublic: books.isPublic,
       isArchived: books.isArchived
     })
@@ -892,11 +919,13 @@ export const getPublicBookByCode = async (
     return null;
   }
 
-  const [copies, copyMap] = await Promise.all([
+  const [copies, copyMap, authorMap] = await Promise.all([
     listBookCopies(db, result.id, Boolean(options?.includePrivatePhone)),
-    getCopyCountsForBookIds(db, [result.id])
+    getCopyCountsForBookIds(db, [result.id]),
+    getAuthorsByBookIds(db, [result.id])
   ]);
   const counts = copyMap.get(result.id);
+  const authors = authorMap.get(result.id) ?? [];
   const activeLoans = copies
     .filter((copy) => copy.status === "borrowed")
     .map((copy) => ({
@@ -925,7 +954,7 @@ export const getPublicBookByCode = async (
     languageName: result.languageName,
     categoryName: result.categoryName,
     publisherName: result.publisherName,
-    authors: splitCommaList(result.authors),
+    authors,
     copyCount: counts?.copyCount ?? (copies.length || 1),
     availableCopyCount: counts?.availableCopyCount ?? copies.filter((copy) => copy.status === "available").length,
     borrowedCopyCount: counts?.borrowedCopyCount ?? activeLoans.length,

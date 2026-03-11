@@ -33,6 +33,9 @@ const mapLoanRow = (row: any, includePrivatePhone = true): LoanRecord => {
     bookTitle: row.bookTitle ?? undefined,
     accessionCode: row.accessionCode ?? undefined,
     borrowerName: row.borrowerName,
+    borrowerOrganization: row.borrowerOrganization ?? undefined,
+    borrowerDesignation: row.borrowerDesignation ?? undefined,
+    borrowerAddress: row.borrowerAddress ?? undefined,
     borrowerPhone: includePrivatePhone ? row.borrowerPhone ?? undefined : undefined,
     borrowerPhoneMasked: maskPhone(row.borrowerPhone),
     borrowerEmail: row.borrowerEmail ?? undefined,
@@ -85,6 +88,9 @@ export const listLoans = async (db: DbClient): Promise<LoanRecord[]> => {
       bookId: loans.bookId,
       bookCopyId: loans.bookCopyId,
       borrowerName: loans.borrowerName,
+      borrowerOrganization: loans.borrowerOrganization,
+      borrowerDesignation: loans.borrowerDesignation,
+      borrowerAddress: loans.borrowerAddress,
       borrowerPhone: loans.borrowerPhone,
       borrowerEmail: loans.borrowerEmail,
       borrowedAt: loans.borrowedAt,
@@ -125,6 +131,9 @@ export const createLoan = async (
       bookId: payload.bookId,
       bookCopyId: targetCopy.id,
       borrowerName: payload.borrowerName,
+      borrowerOrganization: payload.borrowerOrganization,
+      borrowerDesignation: payload.borrowerDesignation,
+      borrowerAddress: payload.borrowerAddress,
       borrowerPhone: payload.borrowerPhone,
       borrowerEmail: payload.borrowerEmail,
       borrowedAt: payload.borrowedAt ?? now,
@@ -150,6 +159,9 @@ export const createLoan = async (
     message: `Loan created for copy ${targetCopy.copyCode}`,
     payload: {
       borrowerName: payload.borrowerName,
+      borrowerOrganization: payload.borrowerOrganization,
+      borrowerDesignation: payload.borrowerDesignation,
+      borrowerAddress: payload.borrowerAddress,
       copyCode: targetCopy.copyCode,
       expectedReturnAt: payload.expectedReturnAt,
       source: options?.source ?? "admin"
@@ -162,6 +174,9 @@ export const createLoan = async (
       bookId: loans.bookId,
       bookCopyId: loans.bookCopyId,
       borrowerName: loans.borrowerName,
+      borrowerOrganization: loans.borrowerOrganization,
+      borrowerDesignation: loans.borrowerDesignation,
+      borrowerAddress: loans.borrowerAddress,
       borrowerPhone: loans.borrowerPhone,
       borrowerEmail: loans.borrowerEmail,
       borrowedAt: loans.borrowedAt,
@@ -225,6 +240,9 @@ export const returnLoan = async (db: DbClient, loanId: number, payload: LoanRetu
       bookId: loans.bookId,
       bookCopyId: loans.bookCopyId,
       borrowerName: loans.borrowerName,
+      borrowerOrganization: loans.borrowerOrganization,
+      borrowerDesignation: loans.borrowerDesignation,
+      borrowerAddress: loans.borrowerAddress,
       borrowerPhone: loans.borrowerPhone,
       borrowerEmail: loans.borrowerEmail,
       borrowedAt: loans.borrowedAt,
@@ -253,4 +271,44 @@ export const countOverdueLoans = async (db: DbClient): Promise<number> => {
     .where(and(eq(loans.status, "borrowed"), lt(loans.expectedReturnAt, now)));
 
   return Number(rows[0]?.count ?? 0);
+};
+
+export const deleteLoan = async (db: DbClient, loanId: number): Promise<boolean> => {
+  const rows = await db
+    .select({
+      id: loans.id,
+      bookId: loans.bookId,
+      bookCopyId: loans.bookCopyId,
+      status: loans.status
+    })
+    .from(loans)
+    .where(eq(loans.id, loanId))
+    .limit(1);
+
+  const existing = rows[0];
+  if (!existing) return false;
+
+  await db.delete(loans).where(eq(loans.id, loanId));
+
+  if (existing.bookCopyId && existing.status === "borrowed") {
+    const activeRows = await db
+      .select({
+        count: sql<number>`COUNT(*)`
+      })
+      .from(loans)
+      .where(and(eq(loans.bookCopyId, existing.bookCopyId), eq(loans.status, "borrowed")));
+
+    await updateCopyStatus(db, existing.bookCopyId, Number(activeRows[0]?.count ?? 0) > 0 ? "borrowed" : "available");
+  }
+
+  await syncBookStatusFromCopies(db, existing.bookId);
+
+  await logActivity(db, {
+    entityType: "loan",
+    entityId: `${loanId}`,
+    action: "loan_deleted",
+    message: `Loan deleted (${loanId})`
+  });
+
+  return true;
 };

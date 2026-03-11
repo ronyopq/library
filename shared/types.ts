@@ -105,6 +105,9 @@ export interface LoanRecord {
   bookTitle?: string;
   accessionCode?: string;
   borrowerName: string;
+  borrowerOrganization?: string;
+  borrowerDesignation?: string;
+  borrowerAddress?: string;
   borrowerPhone?: string;
   borrowerPhoneMasked?: string;
   borrowerEmail?: string;
@@ -124,9 +127,13 @@ export interface LoanRequestRecord {
   publicCode?: string;
   bookTitle?: string;
   requesterName: string;
+  requesterOrganization?: string;
+  requesterDesignation?: string;
+  requesterAddress?: string;
   requesterPhone?: string;
   requesterPhoneMasked?: string;
   requesterEmail?: string;
+  borrowedAt?: string;
   expectedReturnAt?: string;
   note?: string;
   adminNote?: string;

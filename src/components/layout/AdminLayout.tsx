@@ -15,9 +15,9 @@ export const AdminLayout = () => {
       { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { to: "/admin/library", label: "Library", icon: BookOpenText },
       { to: "/admin/books/new", label: "Add Book", icon: Boxes },
-      { to: "/admin/loans", label: "Loans", icon: UsersRound },
+      { to: "/admin/loans", label: "Borrow Menu", icon: UsersRound },
       { to: "/admin/reviews", label: "Reviews", icon: MessageSquareText },
-      { to: "/admin/labels", label: "Print Labels", icon: Printer },
+      { to: "/admin/labels", label: "Barcode Print", icon: Printer },
       { to: "/admin/activity", label: "Activity", icon: ScrollText },
       { to: "/admin/settings", label: "Settings", icon: Settings },
       ...(canManageUsers ? [{ to: "/admin/users", label: "Staff Users", icon: ShieldCheck }] : [])

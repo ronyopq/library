@@ -70,8 +70,12 @@ export const PublicBookPage = () => {
   });
   const [requestForm, setRequestForm] = useState({
     requesterName: "",
+    requesterOrganization: "",
+    requesterDesignation: "",
+    requesterAddress: "",
     requesterPhone: "",
     requesterEmail: "",
+    borrowedAt: "",
     expectedReturnAt: "",
     requestedCopyId: "",
     note: ""
@@ -110,8 +114,12 @@ export const PublicBookPage = () => {
         method: "POST",
         body: JSON.stringify({
           requesterName: requestForm.requesterName,
+          requesterOrganization: requestForm.requesterOrganization || undefined,
+          requesterDesignation: requestForm.requesterDesignation || undefined,
+          requesterAddress: requestForm.requesterAddress || undefined,
           requesterPhone: requestForm.requesterPhone,
           requesterEmail: requestForm.requesterEmail || undefined,
+          borrowedAt: requestForm.borrowedAt || undefined,
           expectedReturnAt: requestForm.expectedReturnAt || undefined,
           requestedCopyId: requestForm.requestedCopyId ? Number(requestForm.requestedCopyId) : undefined,
           note: requestForm.note || undefined
@@ -120,8 +128,12 @@ export const PublicBookPage = () => {
     onSuccess: () => {
       setRequestForm({
         requesterName: "",
+        requesterOrganization: "",
+        requesterDesignation: "",
+        requesterAddress: "",
         requesterPhone: "",
         requesterEmail: "",
+        borrowedAt: "",
         expectedReturnAt: "",
         requestedCopyId: "",
         note: ""
@@ -255,9 +267,27 @@ export const PublicBookPage = () => {
             className="rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm"
           />
           <input
+            value={requestForm.requesterOrganization}
+            onChange={(event) => setRequestForm((prev) => ({ ...prev, requesterOrganization: event.target.value }))}
+            placeholder="Organization (optional)"
+            className="rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm"
+          />
+          <input
+            value={requestForm.requesterDesignation}
+            onChange={(event) => setRequestForm((prev) => ({ ...prev, requesterDesignation: event.target.value }))}
+            placeholder="Designation (optional)"
+            className="rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm"
+          />
+          <input
             value={requestForm.requesterEmail}
             onChange={(event) => setRequestForm((prev) => ({ ...prev, requesterEmail: event.target.value }))}
             placeholder="Email (optional)"
+            className="rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm"
+          />
+          <input
+            type="date"
+            value={requestForm.borrowedAt}
+            onChange={(event) => setRequestForm((prev) => ({ ...prev, borrowedAt: event.target.value }))}
             className="rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm"
           />
           <input
@@ -285,6 +315,12 @@ export const PublicBookPage = () => {
 
           <div />
 
+          <textarea
+            value={requestForm.requesterAddress}
+            onChange={(event) => setRequestForm((prev) => ({ ...prev, requesterAddress: event.target.value }))}
+            placeholder="Address (optional)"
+            className="min-h-20 rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm md:col-span-2"
+          />
           <textarea
             value={requestForm.note}
             onChange={(event) => setRequestForm((prev) => ({ ...prev, note: event.target.value }))}
@@ -375,8 +411,8 @@ export const PublicBookPage = () => {
                     )
                   </p>
                   <p className="text-sm text-app-muted">
-                    {"★".repeat(review.rating)}
-                    {"☆".repeat(Math.max(0, 5 - review.rating))}
+                    {"\u2605".repeat(review.rating)}
+                    {"\u2606".repeat(Math.max(0, 5 - review.rating))}
                   </p>
                 </div>
                 <p className="mt-1 whitespace-pre-wrap text-sm text-app-text">{review.comment}</p>

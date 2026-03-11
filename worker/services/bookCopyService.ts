@@ -4,9 +4,10 @@ import type { DbClient } from "../db/client";
 import { bookCopies, books, loans } from "../db/schema";
 
 const padCopyNumber = (value: number): string => value.toString().padStart(2, "0");
+const padSerial = (value: number): string => value.toString().padStart(5, "0");
 
-export const buildCopyCode = (accessionCode: string, copyNumber: number): string =>
-  `${accessionCode}-C${padCopyNumber(copyNumber)}`;
+export const buildCopyCode = (accessionYear: number, accessionSerial: number, copyNumber: number): string =>
+  `${String(accessionYear % 100).padStart(2, "0")}-${padSerial(accessionSerial)}-${padCopyNumber(copyNumber)}`;
 
 const maskPhone = (phone?: string | null): string | undefined => {
   if (!phone) return undefined;
@@ -185,14 +186,15 @@ export const getAvailableCopyForBook = async (db: DbClient, bookId: number) => {
 export const createBookCopies = async (
   db: DbClient,
   bookId: number,
-  accessionCode: string,
+  accessionYear: number,
+  accessionSerial: number,
   count: number
 ): Promise<void> => {
   const safeCount = Number.isInteger(count) && count > 0 ? count : 1;
   const now = new Date().toISOString();
 
   for (let copyNumber = 1; copyNumber <= safeCount; copyNumber += 1) {
-    const copyCode = buildCopyCode(accessionCode, copyNumber);
+    const copyCode = buildCopyCode(accessionYear, accessionSerial, copyNumber);
     await db
       .insert(bookCopies)
       .values({

@@ -43,7 +43,7 @@ import { findDuplicateMatches } from "../services/duplicateService";
 import { exportBooksCsv, exportLoansCsv } from "../services/exportService";
 import { storeCoverImage } from "../services/imageService";
 import { lookupIsbn } from "../services/isbnService";
-import { createLoan, listLoans, LoanConflictError, returnLoan } from "../services/loanService";
+import { createLoan, deleteLoan, listLoans, LoanConflictError, returnLoan } from "../services/loanService";
 import { createPublicLoanRequest, decideLoanRequest, listLoanRequests } from "../services/loanRequestService";
 import { extractMetadataFromImage } from "../services/ocrService";
 import {
@@ -459,6 +459,19 @@ apiRouter.post("/loans/:id/return", zValidator("json", loanReturnSchema), async 
   if (!loan) return notFound(c, "Loan not found");
 
   return c.json({ loan });
+});
+
+apiRouter.delete("/loans/:id", async (c) => {
+  const id = parseBookId(c.req.param("id"));
+  if (!id) return badRequest(c, "Invalid loan id");
+
+  const db = getDb(c.env);
+  const deleted = await deleteLoan(db, id);
+  if (!deleted) {
+    return notFound(c, "Loan not found");
+  }
+
+  return c.json({ ok: true });
 });
 
 apiRouter.post("/loan-requests/:id/decision", zValidator("json", loanRequestDecisionSchema), async (c) => {

@@ -23,9 +23,13 @@ interface LabelBook {
   copies?: BookCopyItem[];
 }
 
+type PaperSize = "A4" | "Letter" | "Custom";
+
 export const PrintLabelsPage = () => {
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [quantityMap, setQuantityMap] = useState<Record<string, number>>({});
+  const [paperSize, setPaperSize] = useState<PaperSize>("A4");
   const [overrideOptions, setOverrideOptions] = useState<
     Partial<{
       labelIncludeTitle: boolean;
@@ -42,7 +46,7 @@ export const PrintLabelsPage = () => {
     queryKey: ["books", "labels", "copy-aware"],
     queryFn: () =>
       apiRequest<{ items: LabelBook[] }>("/api/books", {
-        params: { includeArchived: 0, includeCopies: 1, limit: 400, sort: "title" }
+        params: { includeArchived: 0, includeCopies: 1, limit: 200, sort: "title" }
       })
   });
 
@@ -74,7 +78,7 @@ export const PrintLabelsPage = () => {
       books.flatMap((book) => {
         const copies = book.copies ?? [];
         if (copies.length === 0) {
-          const fallbackCopyCode = `${book.accessionCode}-C01`;
+          const fallbackCopyCode = `${book.accessionCode}-01`;
           return [
             {
               id: `${book.id}-fallback`,
@@ -115,15 +119,40 @@ export const PrintLabelsPage = () => {
 
   const selectedItems = allLabelItems.filter((item) => selectedIds.includes(item.id));
 
+  const expandedPrintItems = useMemo(
+    () =>
+      selectedItems.flatMap((item) => {
+        const quantity = Math.max(1, Number(quantityMap[item.id] ?? 1));
+        return Array.from({ length: quantity }).map((_, index) => ({
+          ...item,
+          id: `${item.id}-print-${index + 1}`
+        }));
+      }),
+    [selectedItems, quantityMap]
+  );
+
   const toggle = (id: string) => {
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+    setSelectedIds((prev) => {
+      const next = prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id];
+      if (!prev.includes(id)) {
+        setQuantityMap((quantityPrev) => ({ ...quantityPrev, [id]: quantityPrev[id] ?? 1 }));
+      }
+      return next;
+    });
   };
+
+  const totalPrintCount = expandedPrintItems.length;
+  const pageCss =
+    paperSize === "Custom" ? "" : `@media print { @page { size: ${paperSize}; margin: 8mm; } body { margin: 0; } }`;
 
   return (
     <div className="space-y-4">
+      {pageCss ? <style>{pageCss}</style> : null}
       <header className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
-        <h2 className="font-heading text-xl">Print Barcodes and Labels</h2>
-        <p className="text-sm text-app-muted">Generate printable label sheets for selected book copies.</p>
+        <h2 className="font-heading text-xl">Barcode-Level Print Menu</h2>
+        <p className="text-sm text-app-muted">
+          Choose books/copies, set quantity, paper size, and print using standard barcode label settings.
+        </p>
       </header>
 
       <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
@@ -135,7 +164,7 @@ export const PrintLabelsPage = () => {
             className="rounded-xl border border-app-border px-3 py-2 text-sm"
           />
           <button type="button" onClick={() => window.print()} className="rounded-lg bg-app-primary px-4 py-2 text-sm font-medium text-white">
-            Print ({selectedItems.length})
+            Print ({totalPrintCount})
           </button>
           <div className="flex gap-2">
             <button type="button" onClick={() => downloadFile("/api/export/books.csv")} className="rounded-lg border border-app-border px-3 py-2 text-sm">
@@ -145,6 +174,40 @@ export const PrintLabelsPage = () => {
               Export Loans CSV
             </button>
           </div>
+        </div>
+
+        <div className="mt-3 grid gap-3 md:grid-cols-3">
+          <label className="inline-flex items-center gap-2 text-sm">
+            Paper Size
+            <select
+              value={paperSize}
+              onChange={(event) => setPaperSize(event.target.value as PaperSize)}
+              className="rounded-lg border border-app-border px-2 py-1"
+            >
+              <option value="A4">A4</option>
+              <option value="Letter">Letter</option>
+              <option value="Custom">Custom</option>
+            </select>
+          </label>
+
+          <button
+            type="button"
+            onClick={() =>
+              setOverrideOptions((prev) => ({
+                ...prev,
+                labelIncludeTitle: true,
+                labelIncludeAuthor: true,
+                labelIncludeDate: false,
+                labelIncludeQr: true,
+                labelColumns: 3,
+                labelWidthMm: 50,
+                labelHeightMm: 30
+              }))
+            }
+            className="rounded-lg border border-app-border px-3 py-2 text-sm"
+          >
+            Apply Standard Barcode Label
+          </button>
         </div>
 
         <div className="mt-3 flex flex-wrap gap-3 text-sm">
@@ -185,27 +248,75 @@ export const PrintLabelsPage = () => {
               className="w-14 rounded border border-app-border px-2 py-1"
             />
           </label>
+
+          <label className="inline-flex items-center gap-2">
+            Label W(mm)
+            <input
+              type="number"
+              min={20}
+              max={120}
+              value={displaySettings.labelWidthMm}
+              onChange={(event) =>
+                setOverrideOptions((prev) => ({
+                  ...prev,
+                  labelWidthMm: Number(event.target.value)
+                }))
+              }
+              className="w-16 rounded border border-app-border px-2 py-1"
+            />
+          </label>
+          <label className="inline-flex items-center gap-2">
+            Label H(mm)
+            <input
+              type="number"
+              min={15}
+              max={120}
+              value={displaySettings.labelHeightMm}
+              onChange={(event) =>
+                setOverrideOptions((prev) => ({
+                  ...prev,
+                  labelHeightMm: Number(event.target.value)
+                }))
+              }
+              className="w-16 rounded border border-app-border px-2 py-1"
+            />
+          </label>
         </div>
       </section>
 
       <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card print:hidden">
-        <h3 className="font-heading text-base">Select Book Copies</h3>
+        <h3 className="font-heading text-base">Select Books and Copies</h3>
         {filtered.length === 0 ? (
           <EmptyState title="No copies found" />
         ) : (
           <ul className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
             {filtered.map((item) => (
               <li key={item.id} className="rounded-lg border border-app-border p-2 text-sm">
-                <label className="flex cursor-pointer items-start gap-2">
+                <div className="flex items-start gap-2">
                   <input type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => toggle(item.id)} className="mt-1" />
-                  <span>
+                  <div className="min-w-0 flex-1">
                     <strong>{item.title || "Untitled"}</strong>
-                    <br />
-                    <span className="text-xs text-app-muted">
+                    <p className="text-xs text-app-muted">
                       {item.copyCode} - {item.authors?.join(", ")}
-                    </span>
-                  </span>
-                </label>
+                    </p>
+                    <label className="mt-2 inline-flex items-center gap-2 text-xs text-app-muted">
+                      Qty
+                      <input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={quantityMap[item.id] ?? 1}
+                        onChange={(event) =>
+                          setQuantityMap((prev) => ({
+                            ...prev,
+                            [item.id]: Math.max(1, Number(event.target.value || 1))
+                          }))
+                        }
+                        className="w-16 rounded border border-app-border px-2 py-1"
+                      />
+                    </label>
+                  </div>
+                </div>
               </li>
             ))}
           </ul>
@@ -218,7 +329,7 @@ export const PrintLabelsPage = () => {
           gridTemplateColumns: `repeat(${displaySettings.labelColumns}, minmax(0, 1fr))`
         }}
       >
-        {selectedItems.map((item) => (
+        {expandedPrintItems.map((item) => (
           <div
             key={item.id}
             className="print:break-inside-avoid"
