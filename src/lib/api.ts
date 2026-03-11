@@ -5,6 +5,58 @@ interface RequestOptions extends RequestInit {
   params?: Record<string, string | number | boolean | undefined>;
 }
 
+const resolveDetailMessage = (details: unknown): string | undefined => {
+  if (!details) return undefined;
+  if (typeof details === "string") return details;
+  if (Array.isArray(details)) {
+    const firstString = details.find((item) => typeof item === "string");
+    if (typeof firstString === "string") return firstString;
+    const firstObject = details.find((item) => item && typeof item === "object") as Record<string, unknown> | undefined;
+    if (firstObject && typeof firstObject.message === "string" && firstObject.message.trim()) {
+      return firstObject.message;
+    }
+    return undefined;
+  }
+  if (typeof details === "object") {
+    const record = details as Record<string, unknown>;
+    if (typeof record.message === "string") return record.message;
+    if (Array.isArray(record.issues) && record.issues.length > 0) {
+      const firstIssue = record.issues[0] as Record<string, unknown>;
+      if (typeof firstIssue.message === "string" && firstIssue.message.trim()) {
+        return firstIssue.message;
+      }
+    }
+    if (Array.isArray(record.formErrors) && record.formErrors.length > 0) {
+      const first = record.formErrors.find((item) => typeof item === "string");
+      if (typeof first === "string") return first;
+    }
+    if (record.fieldErrors && typeof record.fieldErrors === "object") {
+      const fieldErrors = record.fieldErrors as Record<string, unknown>;
+      for (const value of Object.values(fieldErrors)) {
+        if (Array.isArray(value) && value.length > 0) {
+          const first = value.find((item) => typeof item === "string");
+          if (typeof first === "string") return first;
+        }
+      }
+    }
+  }
+  return undefined;
+};
+
+const resolveApiErrorMessage = (payload: unknown): string => {
+  if (!payload || typeof payload !== "object") return "Request failed";
+  const record = payload as Record<string, unknown>;
+  if (typeof record.error === "string" && record.error.trim()) return record.error;
+  const errorMessage = resolveDetailMessage(record.error);
+  if (errorMessage) return errorMessage;
+  const issuesMessage = resolveDetailMessage(record.issues);
+  if (issuesMessage) return issuesMessage;
+  const detailsMessage = resolveDetailMessage(record.details);
+  if (detailsMessage) return detailsMessage;
+  if (typeof record.message === "string" && record.message.trim()) return record.message;
+  return "Request failed";
+};
+
 const buildUrl = (path: string, params?: RequestOptions["params"]) => {
   const url = new URL(path, window.location.origin);
   if (params) {
@@ -32,7 +84,7 @@ export const apiRequest = async <T>(path: string, options: RequestOptions = {}):
 
   if (!response.ok) {
     const payload = (await response.json().catch(() => ({ error: "Unknown error" }))) as ApiError;
-    const error = new Error(payload.error || "Request failed") as Error & { details?: unknown; status?: number };
+    const error = new Error(resolveApiErrorMessage(payload)) as Error & { details?: unknown; status?: number };
     error.details = payload.details;
     error.status = response.status;
     throw error;
