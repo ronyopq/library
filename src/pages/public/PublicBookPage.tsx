@@ -45,6 +45,20 @@ interface PublicBookResponse {
       borrowedAt?: string;
       expectedReturnAt?: string;
     }>;
+    borrowHistory: Array<{
+      id: number;
+      status: string;
+      borrowerName: string;
+      borrowerOrganization?: string;
+      borrowerDesignation?: string;
+      borrowerPhone?: string;
+      borrowerPhoneMasked?: string;
+      borrowedAt: string;
+      expectedReturnAt?: string;
+      returnedAt?: string;
+      note?: string;
+      copyCode?: string;
+    }>;
   };
   averageRating: number;
   ratingCount: number;
@@ -243,6 +257,49 @@ export const PublicBookPage = () => {
       </article>
 
       <section className="rounded-3xl border border-app-border bg-white p-5 shadow-card">
+        <h3 className="font-heading text-xl">Borrow Reading Log</h3>
+        <p className="mt-1 text-sm text-app-muted">Previous borrowers for this book are listed here.</p>
+        {book.borrowHistory.length === 0 ? (
+          <p className="mt-3 text-sm text-app-muted">No previous borrow history yet.</p>
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="text-left text-app-muted">
+                  <th className="p-2">Borrower</th>
+                  <th className="p-2">Copy</th>
+                  <th className="p-2">Borrow Date</th>
+                  <th className="p-2">Due Date</th>
+                  <th className="p-2">Return Date</th>
+                  <th className="p-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {book.borrowHistory.map((item) => (
+                  <tr key={item.id} className="border-t border-app-border align-top">
+                    <td className="p-2">
+                      <p className="font-medium">{item.borrowerName}</p>
+                      <p className="text-xs text-app-muted">{item.borrowerDesignation || item.borrowerOrganization || "-"}</p>
+                      <p className="text-xs text-app-muted">
+                        {query.data.canViewPrivateContact
+                          ? item.borrowerPhone || "-"
+                          : item.borrowerPhoneMasked || "Phone hidden"}
+                      </p>
+                    </td>
+                    <td className="p-2">{item.copyCode || "-"}</td>
+                    <td className="p-2">{formatDate(item.borrowedAt)}</td>
+                    <td className="p-2">{formatDate(item.expectedReturnAt)}</td>
+                    <td className="p-2">{formatDate(item.returnedAt)}</td>
+                    <td className="p-2">{item.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-3xl border border-app-border bg-white p-5 shadow-card">
         <h3 className="font-heading text-xl">Request Borrow</h3>
         <p className="mt-1 text-sm text-app-muted">Submit a borrow request. Admin or librarian will approve it.</p>
 
@@ -285,18 +342,26 @@ export const PublicBookPage = () => {
             placeholder="Email (optional)"
             className="rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm"
           />
-          <input
-            type="date"
-            value={requestForm.borrowedAt}
-            onChange={(event) => setRequestForm((prev) => ({ ...prev, borrowedAt: event.target.value }))}
-            className="rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm"
-          />
-          <input
-            type="date"
-            value={requestForm.expectedReturnAt}
-            onChange={(event) => setRequestForm((prev) => ({ ...prev, expectedReturnAt: event.target.value }))}
-            className="rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm"
-          />
+          <label className="text-sm">
+            Preferred Borrow Date (optional)
+            <input
+              type="date"
+              value={requestForm.borrowedAt}
+              onChange={(event) => setRequestForm((prev) => ({ ...prev, borrowedAt: event.target.value }))}
+              className="mt-1 w-full rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm"
+            />
+            <span className="mt-1 block text-xs text-app-muted">When you want to collect this book.</span>
+          </label>
+          <label className="text-sm">
+            Expected Return Date (optional)
+            <input
+              type="date"
+              value={requestForm.expectedReturnAt}
+              onChange={(event) => setRequestForm((prev) => ({ ...prev, expectedReturnAt: event.target.value }))}
+              className="mt-1 w-full rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm"
+            />
+            <span className="mt-1 block text-xs text-app-muted">When you plan to return the book.</span>
+          </label>
 
           <label className="text-sm">
             Preferred Copy (optional)

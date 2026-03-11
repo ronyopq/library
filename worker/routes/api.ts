@@ -538,37 +538,44 @@ apiRouter.get("/activity", async (c) => {
   });
 });
 
-apiRouter.get("/options", async (c) => {
+apiRouter.get("/options", requireStaff, async (c) => {
   const db = getDb(c.env);
   const options = await listLibraryOptions(db);
   return c.json(options);
 });
 
-apiRouter.get("/options/catalog", async (c) => {
+apiRouter.get("/options/catalog", requireStaff, async (c) => {
   const db = getDb(c.env);
   const catalog = await listCatalogOptions(db);
   return c.json(catalog);
 });
 
-apiRouter.post("/options/catalog/:domain", requireAdminRole, zValidator("json", optionValueSchema), async (c) => {
-  const domainParsed = optionDomainSchema.safeParse(c.req.param("domain"));
-  if (!domainParsed.success) {
-    return badRequest(c, "Invalid option domain");
-  }
+apiRouter.post(
+  "/options/catalog/:domain",
+  requireStaff,
+  requireAdminRole,
+  zValidator("json", optionValueSchema),
+  async (c) => {
+    const domainParsed = optionDomainSchema.safeParse(c.req.param("domain"));
+    if (!domainParsed.success) {
+      return badRequest(c, "Invalid option domain");
+    }
 
-  const payload = c.req.valid("json");
-  const db = getDb(c.env);
+    const payload = c.req.valid("json");
+    const db = getDb(c.env);
 
-  try {
-    const item = await createCatalogOption(db, domainParsed.data, payload);
-    return c.json({ item }, 201);
-  } catch (error) {
-    return badRequest(c, error instanceof Error ? error.message : "Failed to add option");
+    try {
+      const item = await createCatalogOption(db, domainParsed.data, payload);
+      return c.json({ item }, 201);
+    } catch (error) {
+      return badRequest(c, error instanceof Error ? error.message : "Failed to add option");
+    }
   }
-});
+);
 
 apiRouter.put(
   "/options/catalog/:domain/:id",
+  requireStaff,
   requireAdminRole,
   zValidator("json", optionValueSchema),
   async (c) => {
@@ -595,7 +602,7 @@ apiRouter.put(
   }
 );
 
-apiRouter.delete("/options/catalog/:domain/:id", requireAdminRole, async (c) => {
+apiRouter.delete("/options/catalog/:domain/:id", requireStaff, requireAdminRole, async (c) => {
   const domainParsed = optionDomainSchema.safeParse(c.req.param("domain"));
   if (!domainParsed.success) {
     return badRequest(c, "Invalid option domain");

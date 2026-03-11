@@ -636,6 +636,9 @@ export const BookForm = ({ bookId, initialData, options, draftKey, onSaved }: Bo
 
       <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
         <h2 className={sectionTitleClass}>Acquisition</h2>
+        <p className="mb-3 text-xs text-app-muted">
+          Date fields are used for purchase and gift history reports. If unknown, leave them empty.
+        </p>
         <div className="grid gap-3 md:grid-cols-2">
           <select {...form.register("acquisitionType")} className={inputClass}>
             <option value="other">Other</option>
@@ -643,9 +646,15 @@ export const BookForm = ({ bookId, initialData, options, draftKey, onSaved }: Bo
             <option value="gift">Gift</option>
           </select>
           <input {...form.register("storeName")} placeholder="Store Name" className={inputClass} />
-          <input type="date" {...form.register("purchaseDate")} className={inputClass} />
+          <label className="text-sm text-app-muted">
+            Purchase Date
+            <input type="date" {...form.register("purchaseDate")} className={`${inputClass} mt-1`} />
+          </label>
           <input {...form.register("price")} placeholder="Price" className={inputClass} />
-          <input type="date" {...form.register("giftDate")} className={inputClass} />
+          <label className="text-sm text-app-muted">
+            Gift Date
+            <input type="date" {...form.register("giftDate")} className={`${inputClass} mt-1`} />
+          </label>
           <input {...form.register("giverName")} placeholder="Giver Name" className={inputClass} />
         </div>
         <textarea {...form.register("giftNote")} placeholder="Gift Note" className={`${inputClass} mt-3 min-h-20`} />

@@ -35,6 +35,13 @@ const splitCommaList = (value?: string | null): string[] => {
     .filter(Boolean);
 };
 
+const maskPhone = (phone?: string | null): string | undefined => {
+  if (!phone) return undefined;
+  const trimmed = phone.trim();
+  if (trimmed.length <= 4) return "****";
+  return `${"*".repeat(Math.max(0, trimmed.length - 4))}${trimmed.slice(-4)}`;
+};
+
 const mapListRow = (
   row: any,
   copyInfo?: {
@@ -951,10 +958,29 @@ export const getPublicBookByCode = async (
     return null;
   }
 
-  const [copies, copyMap, authorMap] = await Promise.all([
+  const [copies, copyMap, authorMap, historyRows] = await Promise.all([
     listBookCopies(db, result.id, Boolean(options?.includePrivatePhone)),
     getCopyCountsForBookIds(db, [result.id]),
-    getAuthorsByBookIds(db, [result.id])
+    getAuthorsByBookIds(db, [result.id]),
+    db
+      .select({
+        id: loans.id,
+        status: loans.status,
+        borrowerName: loans.borrowerName,
+        borrowerOrganization: loans.borrowerOrganization,
+        borrowerDesignation: loans.borrowerDesignation,
+        borrowerPhone: loans.borrowerPhone,
+        borrowedAt: loans.borrowedAt,
+        expectedReturnAt: loans.expectedReturnAt,
+        returnedAt: loans.returnedAt,
+        note: loans.note,
+        copyCode: bookCopies.copyCode
+      })
+      .from(loans)
+      .leftJoin(bookCopies, eq(loans.bookCopyId, bookCopies.id))
+      .where(eq(loans.bookId, result.id))
+      .orderBy(desc(loans.borrowedAt), desc(loans.id))
+      .limit(40)
   ]);
   const counts = copyMap.get(result.id);
   const authors = authorMap.get(result.id) ?? [];
@@ -968,6 +994,20 @@ export const getPublicBookByCode = async (
       borrowedAt: copy.borrowedAt,
       expectedReturnAt: copy.expectedReturnAt
     }));
+  const borrowHistory = historyRows.map((row) => ({
+    id: row.id,
+    status: row.status,
+    borrowerName: row.borrowerName,
+    borrowerOrganization: row.borrowerOrganization ?? undefined,
+    borrowerDesignation: row.borrowerDesignation ?? undefined,
+    borrowerPhone: options?.includePrivatePhone ? row.borrowerPhone ?? undefined : undefined,
+    borrowerPhoneMasked: maskPhone(row.borrowerPhone),
+    borrowedAt: row.borrowedAt,
+    expectedReturnAt: row.expectedReturnAt ?? undefined,
+    returnedAt: row.returnedAt ?? undefined,
+    note: row.note ?? undefined,
+    copyCode: row.copyCode ?? undefined
+  }));
 
   return {
     publicCode: result.publicCode,
@@ -992,6 +1032,7 @@ export const getPublicBookByCode = async (
     borrowedCopyCount: counts?.borrowedCopyCount ?? activeLoans.length,
     lostCopyCount: counts?.lostCopyCount ?? copies.filter((copy) => copy.status === "lost").length,
     copies,
-    activeLoans
+    activeLoans,
+    borrowHistory
   };
 };

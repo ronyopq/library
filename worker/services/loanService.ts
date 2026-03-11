@@ -221,6 +221,15 @@ export const returnLoan = async (db: DbClient, loanId: number, payload: LoanRetu
 
   if (loan.bookCopyId) {
     await updateCopyStatus(db, loan.bookCopyId, payload.markLost ? "lost" : "available");
+    if (payload.markLost && payload.note) {
+      await db
+        .update(bookCopies)
+        .set({
+          note: payload.note,
+          updatedAt: now
+        })
+        .where(eq(bookCopies.id, loan.bookCopyId));
+    }
   }
   await syncBookStatusFromCopies(db, loan.bookId);
 

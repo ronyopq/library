@@ -168,7 +168,16 @@ export const SettingsPage = () => {
         <div className="mt-3 grid gap-3 md:grid-cols-2">
           <input value={form.libraryName} onChange={(event) => update("libraryName", event.target.value)} placeholder="Library Name" className="rounded-xl border border-app-border px-3 py-2 text-sm" />
           <input value={form.publicBaseUrl ?? ""} onChange={(event) => update("publicBaseUrl", event.target.value)} placeholder="Public Base URL" className="rounded-xl border border-app-border px-3 py-2 text-sm" />
-          <input value={form.dateFormat} onChange={(event) => update("dateFormat", event.target.value)} placeholder="Date Format" className="rounded-xl border border-app-border px-3 py-2 text-sm" />
+          <label className="text-sm">
+            Date Format
+            <input
+              value={form.dateFormat}
+              onChange={(event) => update("dateFormat", event.target.value)}
+              placeholder="yyyy-MM-dd"
+              className="mt-1 w-full rounded-xl border border-app-border px-3 py-2 text-sm"
+            />
+            <span className="mt-1 block text-xs text-app-muted">Used across dashboard, borrow history, and public pages.</span>
+          </label>
           <select value={form.publicVisibilityMode} onChange={(event) => update("publicVisibilityMode", event.target.value as SettingsForm["publicVisibilityMode"])} className="rounded-xl border border-app-border px-3 py-2 text-sm">
             <option value="selected">Selected books only</option>
             <option value="all">All books public by default</option>

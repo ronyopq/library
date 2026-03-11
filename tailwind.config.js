@@ -4,8 +4,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        heading: ["Space Grotesk", "ui-sans-serif", "system-ui", "sans-serif"],
-        body: ["Sora", "ui-sans-serif", "system-ui", "sans-serif"]
+        heading: ["Space Grotesk", "Akhanda Bangali", "ui-sans-serif", "system-ui", "sans-serif"],
+        body: ["Sora", "Akhanda Bangali", "ui-sans-serif", "system-ui", "sans-serif"]
       },
       colors: {
         app: {

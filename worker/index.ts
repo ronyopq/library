@@ -66,6 +66,17 @@ app.get("/b/:shortId", async (c) => {
         )
         .join("")}</ul></div>`
     : "";
+  const borrowHistoryHtml = book.borrowHistory.length
+    ? `<div class="history"><h3>Borrow Log</h3><ul>${book.borrowHistory
+        .slice(0, 20)
+        .map((loan) => {
+          const noteText = loan.note ? ` | ${escapeHtml(loan.note)}` : "";
+          return `<li><strong>${escapeHtml(loan.copyCode ?? "-")}</strong> - ${escapeHtml(loan.borrowerName)} | Borrowed: ${escapeHtml(
+            new Date(loan.borrowedAt).toLocaleDateString("en-US")
+          )}${loan.returnedAt ? ` | Returned: ${escapeHtml(new Date(loan.returnedAt).toLocaleDateString("en-US"))}` : ""}${noteText}</li>`;
+        })
+        .join("")}</ul></div>`
+    : "";
   const coverUrl = book.coverImageKey
     ? /^https?:\/\//i.test(book.coverImageKey)
       ? book.coverImageKey
@@ -80,9 +91,16 @@ app.get("/b/:shortId", async (c) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${title} | ${escapeHtml(settings.libraryName)}</title>
   <style>
+    @font-face {
+      font-family: "Akhanda Bangali";
+      src: url("/fonts/Akhand_Bengali/AkhandBengali.otf") format("opentype");
+      font-style: normal;
+      font-weight: 400;
+      font-display: swap;
+    }
     :root {
       color-scheme: light;
-      font-family: "Space Grotesk", sans-serif;
+      font-family: "Space Grotesk", "Akhanda Bangali", sans-serif;
     }
     body {
       margin: 0;
@@ -165,13 +183,25 @@ app.get("/b/:shortId", async (c) => {
       margin: 0 0 8px;
       font-size: 16px;
     }
-    .borrowed ul {
+    .borrowed ul,
+    .history ul {
       margin: 0;
       padding: 0 0 0 18px;
       color: #3c4a70;
       font-size: 14px;
       display: grid;
       gap: 6px;
+    }
+    .history {
+      margin: 0 24px 16px;
+      padding: 12px 14px;
+      background: #f8f9ff;
+      border: 1px solid #e3e9fb;
+      border-radius: 10px;
+    }
+    .history h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
     }
     @media (max-width: 680px) {
       .content {
@@ -205,6 +235,7 @@ app.get("/b/:shortId", async (c) => {
       </div>
     </section>
     ${activeLoansHtml}
+    ${borrowHistoryHtml}
     ${notes ? `<section class="notes">${notes}</section>` : ""}
   </article>
 </body>

@@ -57,6 +57,8 @@ interface BorrowRecord {
   note?: string;
 }
 
+type BorrowCloseAction = "returned" | "lost" | "gifted" | "non_returnable" | "never_lend";
+
 interface BorrowDemandRecord {
   id: number;
   bookId: number;
@@ -110,6 +112,33 @@ const statusFilterFromQuery = (value: string | null): "borrowed" | "returned" | 
   if (!value) return null;
   if (value === "borrowed" || value === "returned" || value === "lost" || value === "overdue") return value;
   return null;
+};
+
+const getClosePayload = (action: BorrowCloseAction): { markLost?: boolean; note?: string } => {
+  switch (action) {
+    case "lost":
+      return { markLost: true, note: "[LOST] Marked as lost by staff." };
+    case "gifted":
+      return { markLost: true, note: "[GIFTED] Copy moved out as a gift." };
+    case "non_returnable":
+      return { markLost: true, note: "[NON_RETURNABLE] Copy declared non-returnable." };
+    case "never_lend":
+      return { markLost: true, note: "[NEVER_LEND] Copy blocked from future lending." };
+    case "returned":
+    default:
+      return {};
+  }
+};
+
+const getStatusPresentation = (borrow: BorrowRecord): { label: string; className: string } => {
+  const note = (borrow.note ?? "").toUpperCase();
+  if (note.includes("[GIFTED]")) return { label: "gifted", className: "bg-fuchsia-100 text-fuchsia-700" };
+  if (note.includes("[NON_RETURNABLE]")) return { label: "non-returnable", className: "bg-slate-200 text-slate-700" };
+  if (note.includes("[NEVER_LEND]")) return { label: "never-lend", className: "bg-zinc-200 text-zinc-700" };
+  if (borrow.status === "returned") return { label: "returned", className: "bg-emerald-100 text-emerald-700" };
+  if (borrow.status === "lost") return { label: "lost", className: "bg-rose-100 text-rose-700" };
+  if (isOverdue(borrow.expectedReturnAt, borrow.status)) return { label: "overdue", className: "bg-rose-100 text-rose-700" };
+  return { label: "borrowed", className: "bg-amber-100 text-amber-700" };
 };
 
 export const LoansPage = () => {
@@ -176,11 +205,11 @@ export const LoansPage = () => {
     onError: (error) => appAlert((error as Error).message)
   });
 
-  const markReturnedMutation = useMutation({
-    mutationFn: (borrowId: number) =>
+  const closeBorrowMutation = useMutation({
+    mutationFn: ({ borrowId, action }: { borrowId: number; action: BorrowCloseAction }) =>
       apiRequest(`/api/loans/${borrowId}/return`, {
         method: "POST",
-        body: JSON.stringify({})
+        body: JSON.stringify(getClosePayload(action))
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["borrows"] });
@@ -329,6 +358,35 @@ export const LoansPage = () => {
     }));
   };
 
+  const runCloseAction = async (borrowId: number, action: BorrowCloseAction) => {
+    const dialogMap: Record<Exclude<BorrowCloseAction, "returned">, { title: string; message: string }> = {
+      lost: {
+        title: "Mark Lost",
+        message: "Mark this borrow entry as lost?"
+      },
+      gifted: {
+        title: "Mark Gift",
+        message: "Mark this copy as gifted and unavailable?"
+      },
+      non_returnable: {
+        title: "Mark Non-returnable",
+        message: "Mark this copy as non-returnable?"
+      },
+      never_lend: {
+        title: "Never Lend Again",
+        message: "Block this copy from future lending?"
+      }
+    };
+
+    if (action !== "returned") {
+      const dialog = dialogMap[action];
+      const confirmed = await appConfirm(dialog.message, dialog.title);
+      if (!confirmed) return;
+    }
+
+    closeBorrowMutation.mutate({ borrowId, action });
+  };
+
   useEffect(() => {
     if (!focusDemandId) return;
     const node = document.getElementById(`borrow-demand-${focusDemandId}`);
@@ -446,17 +504,20 @@ export const LoansPage = () => {
                         </option>
                       ))}
                     </select>
-                    <input
-                      type="date"
-                      value={decision.expectedReturnAt}
-                      onChange={(event) =>
-                        setDecisionState((prev) => ({
-                          ...prev,
-                          [demand.id]: { ...decision, expectedReturnAt: event.target.value }
-                        }))
-                      }
-                      className="rounded-xl border border-app-border px-3 py-2 text-sm"
-                    />
+                    <label className="text-sm">
+                      Approved Return Date
+                      <input
+                        type="date"
+                        value={decision.expectedReturnAt}
+                        onChange={(event) =>
+                          setDecisionState((prev) => ({
+                            ...prev,
+                            [demand.id]: { ...decision, expectedReturnAt: event.target.value }
+                          }))
+                        }
+                        className="mt-1 w-full rounded-xl border border-app-border px-3 py-2 text-sm"
+                      />
+                    </label>
                     <input
                       value={decision.adminNote}
                       onChange={(event) =>
@@ -557,8 +618,26 @@ export const LoansPage = () => {
           <input value={form.borrowerDesignation} onChange={(event) => setForm((prev) => ({ ...prev, borrowerDesignation: event.target.value }))} placeholder="Designation" className="rounded-xl border border-app-border px-3 py-2 text-sm" />
           <input value={form.borrowerPhone} onChange={(event) => setForm((prev) => ({ ...prev, borrowerPhone: event.target.value }))} placeholder="Mobile number" className="rounded-xl border border-app-border px-3 py-2 text-sm" />
           <input value={form.borrowerEmail} onChange={(event) => setForm((prev) => ({ ...prev, borrowerEmail: event.target.value }))} placeholder="Email" className="rounded-xl border border-app-border px-3 py-2 text-sm" />
-          <input type="date" value={form.borrowedAt} onChange={(event) => setForm((prev) => ({ ...prev, borrowedAt: event.target.value }))} className="rounded-xl border border-app-border px-3 py-2 text-sm" />
-          <input type="date" value={form.expectedReturnAt} onChange={(event) => setForm((prev) => ({ ...prev, expectedReturnAt: event.target.value }))} className="rounded-xl border border-app-border px-3 py-2 text-sm" />
+          <label className="text-sm">
+            Borrow Date
+            <input
+              type="date"
+              value={form.borrowedAt}
+              onChange={(event) => setForm((prev) => ({ ...prev, borrowedAt: event.target.value }))}
+              className="mt-1 w-full rounded-xl border border-app-border px-3 py-2 text-sm"
+            />
+            <span className="mt-1 block text-xs text-app-muted">When borrower receives the book.</span>
+          </label>
+          <label className="text-sm">
+            Expected Return Date
+            <input
+              type="date"
+              value={form.expectedReturnAt}
+              onChange={(event) => setForm((prev) => ({ ...prev, expectedReturnAt: event.target.value }))}
+              className="mt-1 w-full rounded-xl border border-app-border px-3 py-2 text-sm"
+            />
+            <span className="mt-1 block text-xs text-app-muted">Planned return deadline for due tracking.</span>
+          </label>
           <textarea value={form.borrowerAddress} onChange={(event) => setForm((prev) => ({ ...prev, borrowerAddress: event.target.value }))} placeholder="Address" className="min-h-20 rounded-xl border border-app-border px-3 py-2 text-sm md:col-span-2" />
           <textarea value={form.note} onChange={(event) => setForm((prev) => ({ ...prev, note: event.target.value }))} placeholder="Notes" className="min-h-20 rounded-xl border border-app-border px-3 py-2 text-sm md:col-span-2" />
         </div>
@@ -645,6 +724,7 @@ export const LoansPage = () => {
                 <tbody>
                   {pagedHistory.map((borrow) => {
                     const remaining = getRemainingDays(borrow.expectedReturnAt);
+                    const statusPresentation = getStatusPresentation(borrow);
                     return (
                       <tr key={borrow.id} className="border-t border-app-border align-top">
                         <td className="p-2">
@@ -668,28 +748,51 @@ export const LoansPage = () => {
                           </p>
                         </td>
                         <td className="p-2">
-                          <span
-                            className={`rounded-full px-2 py-1 text-xs ${
-                              borrow.status === "returned"
-                                ? "bg-emerald-100 text-emerald-700"
-                                : isOverdue(borrow.expectedReturnAt, borrow.status)
-                                  ? "bg-rose-100 text-rose-700"
-                                  : "bg-amber-100 text-amber-700"
-                            }`}
-                          >
-                            {borrow.status}
+                          <span className={`rounded-full px-2 py-1 text-xs ${statusPresentation.className}`}>
+                            {statusPresentation.label}
                           </span>
+                          {borrow.note ? <p className="mt-1 text-xs text-app-muted">{borrow.note}</p> : null}
                         </td>
                         <td className="p-2">
                           <div className="flex flex-col gap-2">
                             {borrow.status === "borrowed" ? (
-                              <button
-                                type="button"
-                                onClick={() => markReturnedMutation.mutate(borrow.id)}
-                                className="rounded-lg border border-app-border px-3 py-1 text-xs"
-                              >
-                                Mark Returned
-                              </button>
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => runCloseAction(borrow.id, "returned")}
+                                  className="rounded-lg border border-app-border px-3 py-1 text-xs"
+                                >
+                                  Mark Returned
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => runCloseAction(borrow.id, "lost")}
+                                  className="rounded-lg border border-rose-200 px-3 py-1 text-xs text-rose-700"
+                                >
+                                  Lost
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => runCloseAction(borrow.id, "gifted")}
+                                  className="rounded-lg border border-fuchsia-200 px-3 py-1 text-xs text-fuchsia-700"
+                                >
+                                  Gift
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => runCloseAction(borrow.id, "non_returnable")}
+                                  className="rounded-lg border border-slate-300 px-3 py-1 text-xs text-slate-700"
+                                >
+                                  Non-returnable
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => runCloseAction(borrow.id, "never_lend")}
+                                  className="rounded-lg border border-zinc-300 px-3 py-1 text-xs text-zinc-700"
+                                >
+                                  Never Lend Again
+                                </button>
+                              </>
                             ) : null}
                             <button
                               type="button"

@@ -4,8 +4,44 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: "Akhanda Bangali";
+  src: url("/fonts/Akhand_Bengali/AkhandBengali.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0980-09FF, U+200C-200D, U+0964-0965;
+}
+
+@font-face {
+  font-family: "Akhanda Bangali";
+  src: url("/fonts/Akhand_Bengali/AkhandBengali-Semilight.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0980-09FF, U+200C-200D, U+0964-0965;
+}
+
+@font-face {
+  font-family: "Akhanda Bangali";
+  src: url("/fonts/Akhand_Bengali/AkhandBengali-Semibold.otf") format("opentype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0980-09FF, U+200C-200D, U+0964-0965;
+}
+
+@font-face {
+  font-family: "Akhanda Bangali";
+  src: url("/fonts/Akhand_Bengali/AkhandBengali-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0980-09FF, U+200C-200D, U+0964-0965;
+}
+
 :root {
-  font-family: "Sora", sans-serif;
+  font-family: "Sora", "Akhanda Bangali", sans-serif;
   color: #1b2440;
   background: #f5f7fb;
 }
