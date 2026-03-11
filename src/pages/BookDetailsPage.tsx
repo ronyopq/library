@@ -61,13 +61,6 @@ interface BookDetails {
   }>;
 }
 
-const statusBadgeClass = (status?: string) =>
-  status === "borrowed"
-    ? "bg-amber-100 text-amber-800"
-    : status === "lost"
-      ? "bg-rose-100 text-rose-700"
-      : "bg-emerald-100 text-emerald-700";
-
 const DAY_MS = 24 * 60 * 60 * 1000;
 const getReadingDays = (borrowedAt?: string, returnedAt?: string): number | null => {
   if (!borrowedAt) return null;
@@ -240,36 +233,6 @@ export const BookDetailsPage = () => {
             <p className="mt-1 whitespace-pre-wrap text-sm text-app-muted">{book.personalNotes || "-"}</p>
           </div>
         </article>
-      </section>
-
-      <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
-        <h3 className="font-heading text-base">Copy-wise Lending and Barcode</h3>
-        {copies.length === 0 ? (
-          <p className="mt-2 text-sm text-app-muted">No copy records found.</p>
-        ) : (
-          <div className="mt-3 space-y-3">
-            {copies.map((copy) => (
-              <article key={copy.id} className="rounded-xl border border-app-border p-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium">{copy.copyCode}</p>
-                    <p className="text-xs text-app-muted">
-                      Borrowed by: {copy.borrowerName || "Not borrowed"}
-                      {copy.borrowedAt ? ` - ${formatDate(copy.borrowedAt)}` : ""}
-                      {copy.expectedReturnAt ? ` (Due ${formatDate(copy.expectedReturnAt)})` : ""}
-                    </p>
-                    <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] ${statusBadgeClass(copy.status)}`}>
-                      {copy.status}
-                    </span>
-                  </div>
-                  <div className="w-[220px] max-w-full overflow-hidden rounded border border-app-border p-2">
-                    <BarcodeSvg value={copy.barcodeValue || copy.copyCode} height={38} width={1.1} />
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
       </section>
 
       <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">

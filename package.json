@@ -12,7 +12,9 @@
     "typecheck": "tsc --noEmit",
     "db:migrate:local": "wrangler d1 migrations apply library-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply library-db --remote",
+    "db:reset:remote": "wrangler d1 execute library-db --remote --file scripts/reset_remote_data.sql",
     "db:seed:local": "wrangler d1 execute library-db --local --file drizzle/0001_seed.sql",
+    "db:import:excel": "node scripts/import_books_from_excel.mjs",
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
@@ -47,6 +49,7 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.3",
     "vite": "^6.1.0",
-    "wrangler": "^4.0.0"
+    "wrangler": "^4.0.0",
+    "xlsx": "^0.18.5"
   }
 }
