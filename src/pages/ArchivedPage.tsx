@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookCard } from "@/components/books/BookCard";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
 import { LoadingState } from "@/components/common/LoadingState";
+import { Pagination } from "@/components/common/Pagination";
 import { apiRequest } from "@/lib/api";
 
 interface BooksResponse {
@@ -11,19 +13,22 @@ interface BooksResponse {
 }
 
 export const ArchivedPage = () => {
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 50;
   const queryClient = useQueryClient();
 
   const booksQuery = useQuery({
-    queryKey: ["books", "archived"],
+    queryKey: ["books", "archived", page],
     queryFn: () =>
       apiRequest<BooksResponse>("/api/books", {
         params: {
           includeArchived: 1,
-          limit: 200,
-          offset: 0,
+          limit: PAGE_SIZE,
+          offset: (page - 1) * PAGE_SIZE,
           sort: "recent"
         }
-      })
+      }),
+    placeholderData: (previousData) => previousData
   });
 
   const restoreMutation = useMutation({
@@ -43,10 +48,11 @@ export const ArchivedPage = () => {
     }
   });
 
-  if (booksQuery.isLoading) return <LoadingState />;
+  if (!booksQuery.data && booksQuery.isLoading) return <LoadingState />;
   if (booksQuery.isError) return <ErrorState message={(booksQuery.error as Error).message} retry={() => booksQuery.refetch()} />;
 
   const archived = (booksQuery.data?.items ?? []).filter((item) => item.isArchived);
+  const total = booksQuery.data?.total ?? 0;
 
   return (
     <div className="space-y-4">
@@ -75,6 +81,7 @@ export const ArchivedPage = () => {
           ))}
         </section>
       )}
+      {total > 0 ? <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} isBusy={booksQuery.isFetching} /> : null}
     </div>
   );
 };

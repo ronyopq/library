@@ -16,7 +16,7 @@ export const AdminLayout = () => {
       { to: "/admin/library", label: "Library", icon: BookOpenText },
       { to: "/admin/books", label: "Borrow Timeline", icon: History },
       { to: "/admin/books/new", label: "Add Book", icon: Boxes },
-      { to: "/admin/loans", label: "Borrow Menu", icon: UsersRound },
+      { to: "/admin/borrow", label: "Borrow Menu", icon: UsersRound },
       { to: "/admin/reviews", label: "Reviews", icon: MessageSquareText },
       { to: "/admin/labels", label: "Barcode Print", icon: Printer },
       { to: "/admin/activity", label: "Activity", icon: ScrollText },
@@ -98,7 +98,7 @@ export const AdminLayout = () => {
             >
               Menu
             </button>
-            <p className="text-sm text-app-muted">Manage books, loans, archives, and public visibility.</p>
+            <p className="text-sm text-app-muted">Manage books, borrows, archives, and public visibility.</p>
             <a href="/" className="rounded-lg border border-app-border px-3 py-1.5 text-xs hover:bg-app-surface">
               Public Catalog
             </a>

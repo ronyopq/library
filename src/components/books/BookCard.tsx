@@ -60,7 +60,7 @@ export const BookCard = ({ book, onArchive, onRestore, onDelete }: BookCardProps
 
       <footer className="flex flex-wrap gap-2 border-t border-app-border px-3 py-3">
         <Link
-          to={`/admin/loans?bookId=${book.id}`}
+          to={`/admin/borrow?bookId=${book.id}`}
           className="rounded-lg bg-app-primary px-3 py-1 text-xs text-white hover:bg-app-primary-strong"
         >
           Borrow

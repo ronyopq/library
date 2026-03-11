@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { LabelPreview, type LabelItem } from "@/components/labels/LabelPreview";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
 import { LoadingState } from "@/components/common/LoadingState";
+import { Pagination } from "@/components/common/Pagination";
 import { apiRequest, downloadFile } from "@/lib/api";
 
 interface BookCopyItem {
@@ -25,8 +26,11 @@ interface LabelBook {
 
 type PaperSize = "A4" | "Letter" | "Custom";
 
+const PAGE_SIZE = 50;
+
 export const PrintLabelsPage = () => {
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [quantityMap, setQuantityMap] = useState<Record<string, number>>({});
   const [paperSize, setPaperSize] = useState<PaperSize>("A4");
@@ -42,12 +46,17 @@ export const PrintLabelsPage = () => {
     }>
   >({});
 
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
+
   const booksQuery = useQuery({
-    queryKey: ["books", "labels", "copy-aware"],
+    queryKey: ["books", "barcode-print", "copy-aware"],
     queryFn: () =>
       apiRequest<{ items: LabelBook[] }>("/api/books", {
-        params: { includeArchived: 0, includeCopies: 1, limit: 200, sort: "title" }
-      })
+        params: { includeArchived: 0, includeCopies: 1, limit: 200, sort: "title", offset: 0 }
+      }),
+    placeholderData: (previousData) => previousData
   });
 
   const settingsQuery = useQuery({
@@ -55,7 +64,7 @@ export const PrintLabelsPage = () => {
     queryFn: () => apiRequest<{ settings: any }>("/api/settings")
   });
 
-  if (booksQuery.isLoading || settingsQuery.isLoading) return <LoadingState />;
+  if ((!booksQuery.data && booksQuery.isLoading) || settingsQuery.isLoading) return <LoadingState />;
   if (booksQuery.isError || settingsQuery.isError) {
     return <ErrorState message={(booksQuery.error as Error)?.message || (settingsQuery.error as Error)?.message || "Failed"} />;
   }
@@ -117,6 +126,7 @@ export const PrintLabelsPage = () => {
     );
   }, [allLabelItems, search]);
 
+  const pagedItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const selectedItems = allLabelItems.filter((item) => selectedIds.includes(item.id));
 
   const expandedPrintItems = useMemo(
@@ -141,7 +151,6 @@ export const PrintLabelsPage = () => {
     });
   };
 
-  const totalPrintCount = expandedPrintItems.length;
   const pageCss =
     paperSize === "Custom" ? "" : `@media print { @page { size: ${paperSize}; margin: 8mm; } body { margin: 0; } }`;
 
@@ -149,10 +158,8 @@ export const PrintLabelsPage = () => {
     <div className="space-y-4">
       {pageCss ? <style>{pageCss}</style> : null}
       <header className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
-        <h2 className="font-heading text-xl">Barcode-Level Print Menu</h2>
-        <p className="text-sm text-app-muted">
-          Choose books/copies, set quantity, paper size, and print using standard barcode label settings.
-        </p>
+        <h2 className="font-heading text-xl">Barcode Print Menu</h2>
+        <p className="text-sm text-app-muted">Standard label workflow: search copies, choose quantity, set paper standard, preview, and print.</p>
       </header>
 
       <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
@@ -160,18 +167,18 @@ export const PrintLabelsPage = () => {
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search title, accession, copy code, author"
+            placeholder="Search by title, author, accession, public code, copy code"
             className="rounded-xl border border-app-border px-3 py-2 text-sm"
           />
           <button type="button" onClick={() => window.print()} className="rounded-lg bg-app-primary px-4 py-2 text-sm font-medium text-white">
-            Print ({totalPrintCount})
+            Print ({expandedPrintItems.length})
           </button>
           <div className="flex gap-2">
             <button type="button" onClick={() => downloadFile("/api/export/books.csv")} className="rounded-lg border border-app-border px-3 py-2 text-sm">
               Export Books CSV
             </button>
             <button type="button" onClick={() => downloadFile("/api/export/loans.csv")} className="rounded-lg border border-app-border px-3 py-2 text-sm">
-              Export Loans CSV
+              Export Borrow CSV
             </button>
           </div>
         </div>
@@ -193,8 +200,7 @@ export const PrintLabelsPage = () => {
           <button
             type="button"
             onClick={() =>
-              setOverrideOptions((prev) => ({
-                ...prev,
+              setOverrideOptions({
                 labelIncludeTitle: true,
                 labelIncludeAuthor: true,
                 labelIncludeDate: false,
@@ -202,12 +208,16 @@ export const PrintLabelsPage = () => {
                 labelColumns: 3,
                 labelWidthMm: 50,
                 labelHeightMm: 30
-              }))
+              })
             }
             className="rounded-lg border border-app-border px-3 py-2 text-sm"
           >
-            Apply Standard Barcode Label
+            Apply Standard Label
           </button>
+
+          <p className="text-sm text-app-muted">
+            Selected: <strong>{selectedIds.length}</strong> copies
+          </p>
         </div>
 
         <div className="mt-3 flex flex-wrap gap-3 text-sm">
@@ -239,45 +249,30 @@ export const PrintLabelsPage = () => {
               min={1}
               max={5}
               value={displaySettings.labelColumns}
-              onChange={(event) =>
-                setOverrideOptions((prev) => ({
-                  ...prev,
-                  labelColumns: Number(event.target.value)
-                }))
-              }
+              onChange={(event) => setOverrideOptions((prev) => ({ ...prev, labelColumns: Number(event.target.value) }))}
               className="w-14 rounded border border-app-border px-2 py-1"
             />
           </label>
 
           <label className="inline-flex items-center gap-2">
-            Label W(mm)
+            W (mm)
             <input
               type="number"
               min={20}
               max={120}
               value={displaySettings.labelWidthMm}
-              onChange={(event) =>
-                setOverrideOptions((prev) => ({
-                  ...prev,
-                  labelWidthMm: Number(event.target.value)
-                }))
-              }
+              onChange={(event) => setOverrideOptions((prev) => ({ ...prev, labelWidthMm: Number(event.target.value) }))}
               className="w-16 rounded border border-app-border px-2 py-1"
             />
           </label>
           <label className="inline-flex items-center gap-2">
-            Label H(mm)
+            H (mm)
             <input
               type="number"
               min={15}
               max={120}
               value={displaySettings.labelHeightMm}
-              onChange={(event) =>
-                setOverrideOptions((prev) => ({
-                  ...prev,
-                  labelHeightMm: Number(event.target.value)
-                }))
-              }
+              onChange={(event) => setOverrideOptions((prev) => ({ ...prev, labelHeightMm: Number(event.target.value) }))}
               className="w-16 rounded border border-app-border px-2 py-1"
             />
           </label>
@@ -285,41 +280,45 @@ export const PrintLabelsPage = () => {
       </section>
 
       <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card print:hidden">
-        <h3 className="font-heading text-base">Select Books and Copies</h3>
+        <h3 className="font-heading text-base">Step 1: Choose Book Copies</h3>
         {filtered.length === 0 ? (
           <EmptyState title="No copies found" />
         ) : (
-          <ul className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-            {filtered.map((item) => (
-              <li key={item.id} className="rounded-lg border border-app-border p-2 text-sm">
-                <div className="flex items-start gap-2">
-                  <input type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => toggle(item.id)} className="mt-1" />
-                  <div className="min-w-0 flex-1">
-                    <strong>{item.title || "Untitled"}</strong>
-                    <p className="text-xs text-app-muted">
-                      {item.copyCode} - {item.authors?.join(", ")}
-                    </p>
-                    <label className="mt-2 inline-flex items-center gap-2 text-xs text-app-muted">
-                      Qty
-                      <input
-                        type="number"
-                        min={1}
-                        max={100}
-                        value={quantityMap[item.id] ?? 1}
-                        onChange={(event) =>
-                          setQuantityMap((prev) => ({
-                            ...prev,
-                            [item.id]: Math.max(1, Number(event.target.value || 1))
-                          }))
-                        }
-                        className="w-16 rounded border border-app-border px-2 py-1"
-                      />
-                    </label>
+          <div className="space-y-3">
+            <ul className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {pagedItems.map((item) => (
+                <li key={item.id} className="rounded-lg border border-app-border p-2 text-sm">
+                  <div className="flex items-start gap-2">
+                    <input type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => toggle(item.id)} className="mt-1" />
+                    <div className="min-w-0 flex-1">
+                      <strong>{item.title || "Untitled"}</strong>
+                      <p className="text-xs text-app-muted">
+                        {item.copyCode} | {item.publicCode}
+                      </p>
+                      <p className="text-xs text-app-muted">{item.authors?.join(", ") || "Unknown author"}</p>
+                      <label className="mt-2 inline-flex items-center gap-2 text-xs text-app-muted">
+                        Quantity
+                        <input
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={quantityMap[item.id] ?? 1}
+                          onChange={(event) =>
+                            setQuantityMap((prev) => ({
+                              ...prev,
+                              [item.id]: Math.max(1, Number(event.target.value || 1))
+                            }))
+                          }
+                          className="w-16 rounded border border-app-border px-2 py-1"
+                        />
+                      </label>
+                    </div>
                   </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+            <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} isBusy={booksQuery.isFetching} />
+          </div>
         )}
       </section>
 

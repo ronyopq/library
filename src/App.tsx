@@ -53,7 +53,8 @@ export default function App() {
           <Route path="/admin/books/new" element={<BookFormPage />} />
           <Route path="/admin/books/:id/edit" element={<BookFormPage />} />
           <Route path="/admin/books/:id" element={<BookDetailsPage />} />
-          <Route path="/admin/loans" element={<LoansPage />} />
+          <Route path="/admin/borrow" element={<LoansPage />} />
+          <Route path="/admin/loans" element={<Navigate to="/admin/borrow" replace />} />
           <Route path="/admin/labels" element={<PrintLabelsPage />} />
           <Route path="/admin/activity" element={<ActivityPage />} />
           <Route path="/admin/reviews" element={<ReviewsPage />} />

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/api";
@@ -6,6 +6,7 @@ import { resolveCoverImageUrl } from "@/lib/cover";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
 import { LoadingState } from "@/components/common/LoadingState";
+import { Pagination } from "@/components/common/Pagination";
 import { useDebounce } from "@/hooks/useDebounce";
 
 interface PublicBooksResponse {
@@ -39,8 +40,14 @@ export const PublicCatalogPage = () => {
   const [search, setSearch] = useState("");
   const [location, setLocation] = useState("");
   const [category, setCategory] = useState("");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 50;
   const debouncedSearch = useDebounce(search, 280);
   const debouncedLocation = useDebounce(location, 280);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, debouncedLocation, category]);
 
   const summaryQuery = useQuery({
     queryKey: ["public-summary"],
@@ -53,20 +60,23 @@ export const PublicCatalogPage = () => {
   });
 
   const booksQuery = useQuery({
-    queryKey: ["public-books", debouncedSearch, debouncedLocation, category],
+    queryKey: ["public-books", debouncedSearch, debouncedLocation, category, page],
     queryFn: () =>
       apiRequest<PublicBooksResponse>("/api/public/books", {
         params: {
           search: debouncedSearch,
           location: debouncedLocation,
           category,
-          limit: 200,
-          offset: 0
+          limit: PAGE_SIZE,
+          offset: (page - 1) * PAGE_SIZE
         }
-      })
+      }),
+    placeholderData: (previousData) => previousData
   });
 
-  if (summaryQuery.isLoading || booksQuery.isLoading || optionsQuery.isLoading) return <LoadingState label="Loading public catalog..." />;
+  if (summaryQuery.isLoading || optionsQuery.isLoading || (!booksQuery.data && booksQuery.isLoading)) {
+    return <LoadingState label="Loading public catalog..." />;
+  }
   if (summaryQuery.isError || booksQuery.isError || optionsQuery.isError) {
     return (
       <ErrorState
@@ -81,6 +91,7 @@ export const PublicCatalogPage = () => {
   }
 
   const books = booksQuery.data?.items ?? [];
+  const total = booksQuery.data?.total ?? 0;
   const publicCategories = optionsQuery.data?.categories ?? [];
 
   return (
@@ -117,6 +128,7 @@ export const PublicCatalogPage = () => {
             ))}
           </select>
         </div>
+        {booksQuery.isFetching ? <p className="mt-2 text-xs text-app-muted">Searching...</p> : null}
       </section>
 
       {books.length === 0 ? (
@@ -158,6 +170,7 @@ export const PublicCatalogPage = () => {
           })}
         </section>
       )}
+      {total > 0 ? <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} isBusy={booksQuery.isFetching} /> : null}
     </div>
   );
 };

@@ -77,11 +77,11 @@ export const DashboardPage = () => {
           <p className="text-xs text-app-muted">Total Languages</p>
           <p className="mt-1 font-heading text-2xl">{stats.totalLanguages}</p>
         </Link>
-        <Link to="/admin/loans?status=borrowed" className={cardStyle}>
+        <Link to="/admin/borrow?status=borrowed" className={cardStyle}>
           <p className="text-xs text-app-muted">Borrowed</p>
           <p className="mt-1 font-heading text-2xl text-amber-700">{stats.totalBorrowed}</p>
         </Link>
-        <Link to="/admin/loans?status=overdue" className={cardStyle}>
+        <Link to="/admin/borrow?status=overdue" className={cardStyle}>
           <p className="text-xs text-app-muted">Overdue</p>
           <p className="mt-1 font-heading text-2xl text-rose-700">{stats.overdueCount}</p>
         </Link>
@@ -100,8 +100,8 @@ export const DashboardPage = () => {
           <article className="rounded-xl border border-app-border p-3">
             <div className="flex items-center justify-between">
               <p className="font-medium">New Borrow Requests</p>
-              <Link to="/admin/loans#requests" className="text-xs text-app-primary hover:underline">
-                Open Loans
+              <Link to="/admin/borrow#requests" className="text-xs text-app-primary hover:underline">
+                Open Borrow Menu
               </Link>
             </div>
             {pendingRequests.length === 0 ? (
@@ -110,7 +110,7 @@ export const DashboardPage = () => {
               <ul className="mt-2 space-y-2 text-sm">
                 {pendingRequests.slice(0, 5).map((item) => (
                   <li key={item.id} className="rounded-lg bg-app-surface p-2">
-                    <Link to={`/admin/loans?focusRequest=${item.id}`} className="block">
+                    <Link to={`/admin/borrow?focusRequest=${item.id}`} className="block">
                       <p className="font-medium">{item.bookTitle || "Unknown book"}</p>
                       <p className="text-xs text-app-muted">
                         {item.requesterName} - {formatDate(item.requestedAt)}
@@ -177,7 +177,7 @@ export const DashboardPage = () => {
           <ul className="mt-3 space-y-2 text-sm">
             {stats.recentLoans.map((loan) => (
               <li key={loan.id} className="rounded-xl border border-app-border p-3">
-                <Link to="/admin/loans" className="block">
+                <Link to="/admin/borrow" className="block">
                   <p className="font-medium text-app-text">{loan.bookTitle || "Unknown Book"}</p>
                   <p className="text-app-muted">{loan.borrowerName}</p>
                   <p className="text-xs text-app-muted">

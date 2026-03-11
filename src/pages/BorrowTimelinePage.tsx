@@ -1,10 +1,11 @@
 import { MessageSquareText } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
 import { LoadingState } from "@/components/common/LoadingState";
+import { Pagination } from "@/components/common/Pagination";
 import { apiRequest } from "@/lib/api";
 import { formatDate } from "@/lib/date";
 
@@ -35,6 +36,11 @@ const calculateReadingDays = (borrowedAt?: string, returnedAt?: string): number 
 
 export const BorrowTimelinePage = () => {
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 50;
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
 
   const loansQuery = useQuery({
     queryKey: ["loans", "timeline"],
@@ -55,6 +61,10 @@ export const BorrowTimelinePage = () => {
       }),
     [allLoans, keyword]
   );
+  const pagedLoans = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return loans.slice(start, start + PAGE_SIZE);
+  }, [loans, page]);
 
   if (loansQuery.isLoading) return <LoadingState />;
   if (loansQuery.isError) return <ErrorState message={(loansQuery.error as Error).message} />;
@@ -80,7 +90,7 @@ export const BorrowTimelinePage = () => {
       ) : (
         <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
           <div className="space-y-4">
-            {loans.map((loan) => {
+            {pagedLoans.map((loan) => {
               const totalDays = calculateReadingDays(loan.borrowedAt, loan.returnedAt);
               return (
                 <article key={loan.id} className="relative rounded-xl border border-app-border p-4">
@@ -141,6 +151,7 @@ export const BorrowTimelinePage = () => {
           </div>
         </section>
       )}
+      {loans.length > 0 ? <Pagination page={page} pageSize={PAGE_SIZE} total={loans.length} onPageChange={setPage} /> : null}
     </div>
   );
 };

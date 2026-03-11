@@ -4,6 +4,8 @@ import { useSearchParams } from "react-router-dom";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
 import { LoadingState } from "@/components/common/LoadingState";
+import { Pagination } from "@/components/common/Pagination";
+import { useDebounce } from "@/hooks/useDebounce";
 import { apiRequest } from "@/lib/api";
 import { formatDate } from "@/lib/date";
 
@@ -25,17 +27,25 @@ export const ReviewsPage = () => {
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 50;
   const [editing, setEditing] = useState<Record<number, AdminReview>>({});
+  const debouncedSearch = useDebounce(search, 280);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
 
   const query = useQuery({
-    queryKey: ["admin-reviews", search],
+    queryKey: ["admin-reviews", debouncedSearch],
     queryFn: () =>
       apiRequest<{ reviews: AdminReview[] }>("/api/reviews", {
         params: {
-          search,
-          limit: 150
+          search: debouncedSearch,
+          limit: 500
         }
-      })
+      }),
+    placeholderData: (previousData) => previousData
   });
 
   const updateMutation = useMutation({
@@ -80,6 +90,10 @@ export const ReviewsPage = () => {
       })),
     [reviews, editing]
   );
+  const pagedReviews = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return merged.slice(start, start + PAGE_SIZE);
+  }, [merged, page]);
 
   useEffect(() => {
     if (!focusReviewId) return;
@@ -89,7 +103,7 @@ export const ReviewsPage = () => {
     }
   }, [focusReviewId, merged.length]);
 
-  if (query.isLoading) return <LoadingState />;
+  if (!query.data && query.isLoading) return <LoadingState />;
   if (query.isError) return <ErrorState message={(query.error as Error).message} retry={() => query.refetch()} />;
 
   return (
@@ -108,11 +122,13 @@ export const ReviewsPage = () => {
         />
       </section>
 
+      {query.isFetching && query.data ? <p className="text-sm text-app-muted">Updating reviews...</p> : null}
+
       {merged.length === 0 ? (
         <EmptyState title="No reviews found" />
       ) : (
         <section className="space-y-3">
-          {merged.map((review) => (
+          {pagedReviews.map((review) => (
             <article
               id={`review-${review.id}`}
               key={review.id}
@@ -214,6 +230,7 @@ export const ReviewsPage = () => {
           ))}
         </section>
       )}
+      {merged.length > 0 ? <Pagination page={page} pageSize={PAGE_SIZE} total={merged.length} onPageChange={setPage} isBusy={query.isFetching} /> : null}
     </div>
   );
 };
