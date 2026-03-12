@@ -12,13 +12,15 @@ import {
   loanRequestDecisionSchema,
   optionDomainSchema,
   optionValueSchema,
+  resetStaffPasswordSchema,
   loginSchema,
   loanCreateSchema,
   loanReturnSchema,
   ocrExtractSchema,
   publicBorrowRequestCreateSchema,
   publicReviewCreateSchema,
-  settingsSchema
+  settingsSchema,
+  updateStaffUserSchema
 } from "@shared/schemas";
 import type { AppBindings } from "../env";
 import { getDb } from "../db/client";
@@ -37,7 +39,16 @@ import {
   getPublicCatalogSummary,
   listPublicBooks
 } from "../services/bookService";
-import { createStaffUser, listStaffUsers, loginWithPassword, logoutByToken, resolveAuthUser } from "../services/authService";
+import {
+  createStaffUser,
+  deleteStaffUser,
+  listStaffUsers,
+  loginWithPassword,
+  logoutByToken,
+  resetStaffPassword,
+  resolveAuthUser,
+  updateStaffUser
+} from "../services/authService";
 import { getDashboardStats } from "../services/dashboardService";
 import { findDuplicateMatches } from "../services/duplicateService";
 import { exportBooksCsv, exportLoansCsv } from "../services/exportService";
@@ -253,6 +264,59 @@ apiRouter.post("/users", requireStaff, requireAdminRole, zValidator("json", crea
     return c.json({ user }, 201);
   } catch (error) {
     return badRequest(c, error instanceof Error ? error.message : "Unable to create staff user.");
+  }
+});
+
+apiRouter.put("/users/:id", requireStaff, requireAdminRole, zValidator("json", updateStaffUserSchema), async (c) => {
+  const id = parseBookId(c.req.param("id"));
+  if (!id) return badRequest(c, "Invalid user id");
+
+  const db = getDb(c.env);
+  const payload = c.req.valid("json");
+
+  try {
+    const user = await updateStaffUser(db, id, payload, c.get("authUser"));
+    if (!user) {
+      return notFound(c, "User not found");
+    }
+    return c.json({ user });
+  } catch (error) {
+    return badRequest(c, error instanceof Error ? error.message : "Unable to update staff user.");
+  }
+});
+
+apiRouter.post("/users/:id/password", requireStaff, requireAdminRole, zValidator("json", resetStaffPasswordSchema), async (c) => {
+  const id = parseBookId(c.req.param("id"));
+  if (!id) return badRequest(c, "Invalid user id");
+
+  const db = getDb(c.env);
+  const payload = c.req.valid("json");
+
+  try {
+    const ok = await resetStaffPassword(db, id, payload, c.get("authUser"));
+    if (!ok) {
+      return notFound(c, "User not found");
+    }
+    return c.json({ ok: true });
+  } catch (error) {
+    return badRequest(c, error instanceof Error ? error.message : "Unable to reset password.");
+  }
+});
+
+apiRouter.delete("/users/:id", requireStaff, requireAdminRole, async (c) => {
+  const id = parseBookId(c.req.param("id"));
+  if (!id) return badRequest(c, "Invalid user id");
+
+  const db = getDb(c.env);
+
+  try {
+    const ok = await deleteStaffUser(db, id, c.get("authUser"));
+    if (!ok) {
+      return notFound(c, "User not found");
+    }
+    return c.json({ ok: true });
+  } catch (error) {
+    return badRequest(c, error instanceof Error ? error.message : "Unable to delete staff user.");
   }
 });
 

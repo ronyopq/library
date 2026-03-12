@@ -1,5 +1,5 @@
-import { and, eq, gt, sql } from "drizzle-orm";
-import type { CreateStaffUserInput, LoginInput } from "@shared/schemas";
+import { and, eq, gt, ne, sql } from "drizzle-orm";
+import type { CreateStaffUserInput, LoginInput, ResetStaffPasswordInput, UpdateStaffUserInput } from "@shared/schemas";
 import type { AuthUser } from "@shared/types";
 import type { DbClient } from "../db/client";
 import type { Env } from "../env";
@@ -171,6 +171,17 @@ export const ensureDefaultUsers = async (db: DbClient): Promise<void> => {
       updatedAt: now
     });
   }
+};
+
+const getActiveAdminCount = async (db: DbClient): Promise<number> => {
+  const rows = await db
+    .select({
+      count: sql<number>`COUNT(*)`
+    })
+    .from(users)
+    .where(and(eq(users.role, "admin"), eq(users.isActive, true)));
+
+  return Number(rows[0]?.count ?? 0);
 };
 
 export const loginWithPassword = async (
@@ -364,4 +375,192 @@ export const createStaffUser = async (
   });
 
   return toAuthUser(created);
+};
+
+export const updateStaffUser = async (
+  db: DbClient,
+  userId: number,
+  input: UpdateStaffUserInput,
+  actor?: AuthUser
+): Promise<AuthUser | null> => {
+  await ensureDefaultUsers(db);
+
+  const targetRows = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      fullName: users.fullName,
+      phone: users.phone,
+      role: users.role,
+      isActive: users.isActive
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  const target = targetRows[0];
+  if (!target || !target.isActive) {
+    return null;
+  }
+
+  const username = normalizeUnicode(input.username);
+  const usernameNormalized = normalizeKey(input.username);
+  if (!username || !usernameNormalized) {
+    throw new Error("Username is required.");
+  }
+
+  const existing = await db
+    .select({
+      id: users.id
+    })
+    .from(users)
+    .where(and(eq(users.usernameNormalized, usernameNormalized), ne(users.id, userId), eq(users.isActive, true)))
+    .limit(1);
+
+  if (existing[0]) {
+    throw new Error("Username already exists.");
+  }
+
+  if (target.role === "admin" && input.role !== "admin") {
+    const adminCount = await getActiveAdminCount(db);
+    if (adminCount <= 1) {
+      throw new Error("At least one active admin account is required.");
+    }
+  }
+
+  const now = new Date().toISOString();
+  const updatedRows = await db
+    .update(users)
+    .set({
+      username,
+      usernameNormalized,
+      fullName: normalizeUnicode(input.fullName),
+      phone: normalizeUnicode(input.phone),
+      role: input.role,
+      updatedAt: now
+    })
+    .where(eq(users.id, userId))
+    .returning({
+      id: users.id,
+      username: users.username,
+      fullName: users.fullName,
+      phone: users.phone,
+      role: users.role
+    });
+
+  const updated = updatedRows[0];
+
+  await logActivity(db, {
+    entityType: "user",
+    entityId: `${updated.id}`,
+    action: "staff_updated",
+    message: `Staff user updated (${updated.username})`,
+    payload: {
+      updatedBy: actor?.username ?? "system",
+      previousRole: target.role,
+      nextRole: updated.role
+    }
+  });
+
+  return toAuthUser(updated);
+};
+
+export const resetStaffPassword = async (
+  db: DbClient,
+  userId: number,
+  input: ResetStaffPasswordInput,
+  actor?: AuthUser
+): Promise<boolean> => {
+  await ensureDefaultUsers(db);
+
+  const targetRows = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      isActive: users.isActive
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  const target = targetRows[0];
+  if (!target || !target.isActive) {
+    return false;
+  }
+
+  const passwordHash = await createPasswordHash(input.password);
+  await db
+    .update(users)
+    .set({
+      passwordHash,
+      updatedAt: new Date().toISOString()
+    })
+    .where(eq(users.id, userId));
+
+  await logActivity(db, {
+    entityType: "user",
+    entityId: `${target.id}`,
+    action: "staff_password_reset",
+    message: `Staff password reset (${target.username})`,
+    payload: {
+      updatedBy: actor?.username ?? "system"
+    }
+  });
+
+  return true;
+};
+
+export const deleteStaffUser = async (db: DbClient, userId: number, actor?: AuthUser): Promise<boolean> => {
+  await ensureDefaultUsers(db);
+
+  const targetRows = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      role: users.role,
+      isActive: users.isActive
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  const target = targetRows[0];
+  if (!target || !target.isActive) {
+    return false;
+  }
+
+  if (actor?.id === userId) {
+    throw new Error("You cannot delete your own account while signed in.");
+  }
+
+  if (target.role === "admin") {
+    const adminCount = await getActiveAdminCount(db);
+    if (adminCount <= 1) {
+      throw new Error("At least one active admin account is required.");
+    }
+  }
+
+  const now = new Date().toISOString();
+  await db
+    .update(users)
+    .set({
+      isActive: false,
+      updatedAt: now
+    })
+    .where(eq(users.id, userId));
+
+  await db.delete(authSessions).where(eq(authSessions.userId, userId));
+
+  await logActivity(db, {
+    entityType: "user",
+    entityId: `${target.id}`,
+    action: "staff_deleted",
+    message: `Staff user deleted (${target.username})`,
+    payload: {
+      role: target.role,
+      deletedBy: actor?.username ?? "system"
+    }
+  });
+
+  return true;
 };

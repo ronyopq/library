@@ -12,6 +12,10 @@ export const activateAdminSession = (token: string, user: AuthUser) => {
   localStorage.setItem(USER_KEY, JSON.stringify(user));
 };
 
+export const updateStoredAuthUser = (user: AuthUser) => {
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+};
+
 export const clearAdminSession = () => {
   localStorage.removeItem(SESSION_KEY);
   localStorage.removeItem(TOKEN_KEY);

@@ -202,6 +202,17 @@ export const createStaffUserSchema = z.object({
   role: z.enum(staffRoles).default("librarian")
 });
 
+export const updateStaffUserSchema = z.object({
+  username: z.string().trim().min(3).max(60),
+  fullName: optionalText,
+  phone: optionalText,
+  role: z.enum(staffRoles).default("librarian")
+});
+
+export const resetStaffPasswordSchema = z.object({
+  password: z.string().min(6).max(200)
+});
+
 export const publicReviewCreateSchema = z.object({
   reviewerName: z.string().trim().min(2).max(120),
   reviewerPhone: z.string().trim().min(5).max(30),
@@ -236,6 +247,8 @@ export type SettingsInput = z.infer<typeof settingsSchema>;
 export type AcquisitionInput = z.infer<typeof acquisitionSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateStaffUserInput = z.infer<typeof createStaffUserSchema>;
+export type UpdateStaffUserInput = z.infer<typeof updateStaffUserSchema>;
+export type ResetStaffPasswordInput = z.infer<typeof resetStaffPasswordSchema>;
 export type PublicReviewCreateInput = z.infer<typeof publicReviewCreateSchema>;
 export type AdminReviewUpdateInput = z.infer<typeof adminReviewUpdateSchema>;
 export type OptionDomainInput = z.infer<typeof optionDomainSchema>;
