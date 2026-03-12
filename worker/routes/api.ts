@@ -221,6 +221,20 @@ apiRouter.get("/public/manifest.webmanifest", async (c) => {
       display: "standalone",
       background_color: "#f5f7fb",
       theme_color: "#365fcf",
+      shortcuts: [
+        {
+          name: "Public Catalog",
+          short_name: "Catalog",
+          url: "/",
+          icons: [{ src: withQueryParam(iconUrl, "size", "192"), sizes: "192x192" }]
+        },
+        {
+          name: "Admin Login",
+          short_name: "Admin",
+          url: "/admin/login",
+          icons: [{ src: withQueryParam(iconUrl, "size", "192"), sizes: "192x192" }]
+        }
+      ],
       icons: [
         { src: withQueryParam(iconUrl, "size", "192"), sizes: "192x192", purpose: "any maskable" },
         { src: withQueryParam(iconUrl, "size", "512"), sizes: "512x512", purpose: "any maskable" }

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import type { BookPayloadInput } from "@shared/schemas";
 import type { DuplicateMatch, IsbnLookupResult, LibraryOptions, LinkMetadataResult, OcrExtractionResult } from "@shared/types";
+import { normalizeIsbn, parseLocalizedNumber } from "@shared/text";
 import { apiRequest } from "@/lib/api";
 import { appAlert } from "@/lib/appDialog";
 import { clearDraft, loadDraft, saveDraft } from "@/lib/draftStore";
@@ -180,7 +181,19 @@ const mapInitialToForm = (initialData?: any): FormValues => {
 const inputClass =
   "w-full rounded-xl border border-app-border bg-white px-3 py-2 text-sm text-app-text placeholder:text-app-muted focus:border-app-primary focus:outline-none";
 
+type ImagePickerTarget = "cover" | "ocr";
+
+const isMobileDevice = () => {
+  if (typeof window === "undefined") return false;
+  const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
+  return coarsePointer || /Android|iPhone|iPad|iPod|Mobile/i.test(window.navigator.userAgent);
+};
+
 export const BookForm = ({ bookId, initialData, options, draftKey, onSaved }: BookFormProps) => {
+  const coverCameraInputRef = useRef<HTMLInputElement | null>(null);
+  const coverGalleryInputRef = useRef<HTMLInputElement | null>(null);
+  const ocrCameraInputRef = useRef<HTMLInputElement | null>(null);
+  const ocrGalleryInputRef = useRef<HTMLInputElement | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | undefined>(resolveCoverImageUrl(initialData?.coverImageKey));
   const [coverImageKey, setCoverImageKey] = useState<string | undefined>(initialData?.coverImageKey);
   const [cropSource, setCropSource] = useState<string | null>(null);
@@ -192,6 +205,7 @@ export const BookForm = ({ bookId, initialData, options, draftKey, onSaved }: Bo
   const [ocrMessage, setOcrMessage] = useState<string>("");
   const [duplicates, setDuplicates] = useState<DuplicateMatch[]>([]);
   const [pendingPayload, setPendingPayload] = useState<BookPayloadInput | null>(null);
+  const [mobileImagePickerTarget, setMobileImagePickerTarget] = useState<ImagePickerTarget | null>(null);
   const [metadataSourceDetails, setMetadataSourceDetails] = useState<Record<string, unknown> | undefined>(
     initialData?.metadataSourceDetails
   );
@@ -208,6 +222,7 @@ export const BookForm = ({ bookId, initialData, options, draftKey, onSaved }: Bo
   });
 
   const values = form.watch();
+  const mobilePickerEnabled = isMobileDevice();
 
   const isCustomValue = (value: string, list: string[] | undefined) => Boolean(value && !(list ?? []).includes(value));
 
@@ -269,19 +284,19 @@ export const BookForm = ({ bookId, initialData, options, draftKey, onSaved }: Bo
       title: data.title || undefined,
       subtitle: data.subtitle || undefined,
       originalTitle: data.originalTitle || undefined,
-      isbn10: data.isbn10 || undefined,
-      isbn13: data.isbn13 || undefined,
+      isbn10: data.isbn10 ? normalizeIsbn(data.isbn10) : undefined,
+      isbn13: data.isbn13 ? normalizeIsbn(data.isbn13) : undefined,
       publisherName: data.publisherName || undefined,
       categoryName: data.categoryName || undefined,
       languageName: data.languageName || undefined,
       edition: data.edition || undefined,
       printingNumber: data.printingNumber || undefined,
-      publicationYear: data.publicationYear ? Number(data.publicationYear) : undefined,
+      publicationYear: parseLocalizedNumber(data.publicationYear),
       publicationCountry: data.publicationCountry || undefined,
       series: data.series || undefined,
       volume: data.volume || undefined,
-      pageCount: data.pageCount ? Number(data.pageCount) : undefined,
-      copyCount: data.copyCount ? Number(data.copyCount) : undefined,
+      pageCount: parseLocalizedNumber(data.pageCount),
+      copyCount: parseLocalizedNumber(data.copyCount),
       format: data.format || undefined,
       condition: data.condition || undefined,
       room: data.room || undefined,
@@ -304,7 +319,7 @@ export const BookForm = ({ bookId, initialData, options, draftKey, onSaved }: Bo
         acquisitionType: data.acquisitionType,
         storeName: data.storeName || undefined,
         purchaseDate: data.purchaseDate || undefined,
-        price: data.price ? Number(data.price) : undefined,
+        price: parseLocalizedNumber(data.price),
         giftDate: data.giftDate || undefined,
         giverName: data.giverName || undefined,
         giftNote: data.giftNote || undefined,
@@ -417,7 +432,7 @@ export const BookForm = ({ bookId, initialData, options, draftKey, onSaved }: Bo
   };
 
   const handleIsbnLookup = async () => {
-    const isbn = form.getValues("isbn13") || form.getValues("isbn10");
+    const isbn = normalizeIsbn(form.getValues("isbn13") || form.getValues("isbn10") || "");
     if (!isbn) {
       appAlert("Please enter an ISBN first.");
       return;
@@ -467,6 +482,30 @@ export const BookForm = ({ bookId, initialData, options, draftKey, onSaved }: Bo
     setCropSource(dataUrl);
   };
 
+  const openImagePicker = (target: ImagePickerTarget) => {
+    if (mobilePickerEnabled) {
+      setMobileImagePickerTarget(target);
+      return;
+    }
+
+    if (target === "cover") {
+      coverGalleryInputRef.current?.click();
+      return;
+    }
+
+    ocrGalleryInputRef.current?.click();
+  };
+
+  const chooseImageSource = (target: ImagePickerTarget, source: "camera" | "gallery") => {
+    setMobileImagePickerTarget(null);
+    const refs =
+      target === "cover"
+        ? { camera: coverCameraInputRef, gallery: coverGalleryInputRef }
+        : { camera: ocrCameraInputRef, gallery: ocrGalleryInputRef };
+
+    refs[source].current?.click();
+  };
+
   const handleCropConfirm = async (croppedDataUrl: string) => {
     setCropSource(null);
     const uploaded = await apiRequest<{ key: string; url: string }>("/api/images/cover", {
@@ -497,14 +536,79 @@ export const BookForm = ({ bookId, initialData, options, draftKey, onSaved }: Bo
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      <input
+        ref={coverCameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(event) => handleCoverSelect(event.target.files?.[0])}
+      />
+      <input
+        ref={coverGalleryInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(event) => handleCoverSelect(event.target.files?.[0])}
+      />
+      <input
+        ref={ocrCameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(event) => handleOcrFile(event.target.files?.[0])}
+      />
+      <input
+        ref={ocrGalleryInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(event) => handleOcrFile(event.target.files?.[0])}
+      />
+
+      {mobileImagePickerTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-app-text/25 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-3xl border border-app-border bg-white p-5 shadow-card">
+            <h3 className="font-heading text-lg">Choose Image Source</h3>
+            <p className="mt-2 text-sm text-app-muted">
+              Use your phone camera to take a new photo, or choose an existing image from the gallery.
+            </p>
+            <div className="mt-4 grid gap-2">
+              <button
+                type="button"
+                onClick={() => chooseImageSource(mobileImagePickerTarget, "camera")}
+                className="rounded-xl bg-app-primary px-4 py-2 text-sm font-medium text-white hover:bg-app-primary-strong"
+              >
+                Use Camera
+              </button>
+              <button
+                type="button"
+                onClick={() => chooseImageSource(mobileImagePickerTarget, "gallery")}
+                className="rounded-xl border border-app-border px-4 py-2 text-sm hover:bg-app-surface"
+              >
+                Choose from Gallery
+              </button>
+              <button
+                type="button"
+                onClick={() => setMobileImagePickerTarget(null)}
+                className="rounded-xl border border-app-border px-4 py-2 text-sm text-app-muted hover:bg-app-surface"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {duplicates.length > 0 ? <DuplicateWarning duplicates={duplicates} onForceSave={handleForceSave} /> : null}
 
       <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
         <h2 className={sectionTitleClass}>ISBN, Book Link, and OCR</h2>
         <div className="grid gap-3 md:grid-cols-[1fr_auto]">
           <div className="grid grid-cols-2 gap-2">
-            <input {...form.register("isbn10")} placeholder="ISBN-10" className={inputClass} />
-            <input {...form.register("isbn13")} placeholder="ISBN-13" className={inputClass} />
+            <input {...form.register("isbn10")} inputMode="numeric" placeholder="ISBN-10" className={inputClass} />
+            <input {...form.register("isbn13")} inputMode="numeric" placeholder="ISBN-13" className={inputClass} />
           </div>
           <button
             type="button"
@@ -534,10 +638,13 @@ export const BookForm = ({ bookId, initialData, options, draftKey, onSaved }: Bo
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-app-border px-3 py-2 text-sm">
+          <button
+            type="button"
+            onClick={() => openImagePicker("ocr")}
+            className="inline-flex items-center gap-2 rounded-lg border border-app-border px-3 py-2 text-sm hover:bg-app-surface"
+          >
             OCR Image Upload
-            <input type="file" accept="image/*" className="hidden" onChange={(event) => handleOcrFile(event.target.files?.[0])} />
-          </label>
+          </button>
           {ocrLoading ? <span className="text-sm text-app-muted">Running OCR...</span> : null}
           {ocrMessage ? <span className="text-sm text-app-muted">{ocrMessage}</span> : null}
         </div>
@@ -549,16 +656,22 @@ export const BookForm = ({ bookId, initialData, options, draftKey, onSaved }: Bo
       <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
         <h2 className={sectionTitleClass}>Cover Image</h2>
         <div className="flex flex-wrap items-center gap-4">
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-app-border px-3 py-2 text-sm">
+          <button
+            type="button"
+            onClick={() => openImagePicker("cover")}
+            className="inline-flex items-center gap-2 rounded-lg border border-app-border px-3 py-2 text-sm hover:bg-app-surface"
+          >
             Upload Cover
-            <input type="file" accept="image/*" className="hidden" onChange={(event) => handleCoverSelect(event.target.files?.[0])} />
-          </label>
+          </button>
           {coverPreview ? (
             <img src={coverPreview} alt="Cover" className="h-28 w-20 rounded-md border border-app-border object-cover" />
           ) : (
             <p className="text-sm text-app-muted">No cover uploaded yet.</p>
           )}
         </div>
+        {mobilePickerEnabled ? (
+          <p className="mt-2 text-xs text-app-muted">On mobile, you can choose camera or gallery before uploading.</p>
+        ) : null}
       </section>
 
       <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
@@ -618,9 +731,9 @@ export const BookForm = ({ bookId, initialData, options, draftKey, onSaved }: Bo
             <input {...form.register("languageName")} placeholder="Custom Language" className={inputClass} />
           ) : null}
 
-          <input {...form.register("publicationYear")} placeholder="Publication Year" className={inputClass} />
-          <input {...form.register("pageCount")} placeholder="Page Count" className={inputClass} />
-          <input {...form.register("copyCount")} placeholder="Number of Copies" className={inputClass} />
+          <input {...form.register("publicationYear")} inputMode="numeric" placeholder="Publication Year (Bangla digits allowed)" className={inputClass} />
+          <input {...form.register("pageCount")} inputMode="numeric" placeholder="Page Count (Bangla digits allowed)" className={inputClass} />
+          <input {...form.register("copyCount")} inputMode="numeric" placeholder="Number of Copies" className={inputClass} />
           <input {...form.register("edition")} placeholder="Edition" className={inputClass} />
           <input {...form.register("printingNumber")} placeholder="Printing Number" className={inputClass} />
           <input {...form.register("series")} placeholder="Series" className={inputClass} />
@@ -698,7 +811,7 @@ export const BookForm = ({ bookId, initialData, options, draftKey, onSaved }: Bo
             Purchase Date
             <input type="date" {...form.register("purchaseDate")} className={`${inputClass} mt-1`} />
           </label>
-          <input {...form.register("price")} placeholder="Price" className={inputClass} />
+          <input {...form.register("price")} inputMode="decimal" placeholder="Price" className={inputClass} />
           <label className="text-sm text-app-muted">
             Gift Date
             <input type="date" {...form.register("giftDate")} className={`${inputClass} mt-1`} />

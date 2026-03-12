@@ -1,15 +1,11 @@
-import { Download, Heart, MapPin, Phone } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Heart, MapPin, Phone } from "lucide-react";
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Outlet } from "react-router-dom";
 import type { PublicSiteSettings } from "@shared/types";
 import { apiRequest } from "@/lib/api";
 import { resolveCoverImageUrl } from "@/lib/cover";
-
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
-}
+import { InstallAppBanner } from "@/components/common/InstallAppBanner";
 
 const upsertMetaTag = (name: string, content: string) => {
   let tag = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement | null;
@@ -42,22 +38,10 @@ const upsertLinkTag = (rel: string, href: string) => {
 };
 
 export const PublicLayout = () => {
-  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-
   const settingsQuery = useQuery({
     queryKey: ["public-site-settings"],
     queryFn: () => apiRequest<{ settings: PublicSiteSettings }>("/api/public/settings")
   });
-
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (event: Event) => {
-      event.preventDefault();
-      setInstallPrompt(event as BeforeInstallPromptEvent);
-    };
-
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-  }, []);
 
   useEffect(() => {
     const settings = settingsQuery.data?.settings;
@@ -94,20 +78,6 @@ export const PublicLayout = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {installPrompt ? (
-              <button
-                type="button"
-                onClick={async () => {
-                  await installPrompt.prompt();
-                  await installPrompt.userChoice;
-                  setInstallPrompt(null);
-                }}
-                className="inline-flex items-center gap-2 rounded-xl border border-app-border px-4 py-2 text-sm hover:bg-app-surface"
-              >
-                <Download className="h-4 w-4" />
-                Install App
-              </button>
-            ) : null}
             <a
               href="/admin/login"
               className="rounded-xl bg-app-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-app-primary-strong"
@@ -119,6 +89,7 @@ export const PublicLayout = () => {
       </header>
 
       <main className="mx-auto max-w-[1200px] px-4 py-6 md:px-6">
+        <InstallAppBanner />
         <Outlet />
       </main>
 

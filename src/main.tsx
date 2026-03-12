@@ -6,6 +6,9 @@ import App from "./App";
 import "./styles.css";
 import { queryClient } from "@/lib/queryClient";
 import { AppDialogProvider } from "@/components/common/AppDialogProvider";
+import { registerServiceWorker } from "@/lib/pwa";
+
+registerServiceWorker();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

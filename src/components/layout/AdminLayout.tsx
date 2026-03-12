@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { clearAdminSession, getStoredAuthUser, isCurrentUserAdmin } from "@/lib/adminAuth";
 import { apiRequest } from "@/lib/api";
+import { InstallAppBanner } from "@/components/common/InstallAppBanner";
 import { resolveCoverImageUrl } from "@/lib/cover";
 
 export const AdminLayout = () => {
@@ -119,6 +120,8 @@ export const AdminLayout = () => {
               Public Catalog
             </a>
           </header>
+
+          <InstallAppBanner />
 
           <main>
             <Outlet />
