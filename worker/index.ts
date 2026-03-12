@@ -245,12 +245,16 @@ app.get("/b/:shortId", async (c) => {
 });
 
 app.get("*", async (c) => {
-  const response = await c.env.ASSETS.fetch(c.req.raw);
-  if (response.status !== 404) {
-    return response;
+  if (c.req.path.startsWith("/api") || c.req.path.startsWith("/i/") || c.req.path.startsWith("/b/")) {
+    return c.notFound();
   }
 
-  if (c.req.path.startsWith("/api") || c.req.path.startsWith("/i/") || c.req.path.startsWith("/b/")) {
+  if (!c.env.ASSETS) {
+    return c.text("This worker serves API and public short links only.", 404);
+  }
+
+  const response = await c.env.ASSETS.fetch(c.req.raw);
+  if (response.status !== 404) {
     return response;
   }
 

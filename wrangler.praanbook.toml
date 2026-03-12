@@ -2,10 +2,6 @@ name = "praanbook-worker"
 main = "worker/index.ts"
 compatibility_date = "2026-03-10"
 
-[assets]
-directory = "./dist"
-binding = "ASSETS"
-
 [[d1_databases]]
 binding = "DB"
 database_name = "praanbook-db"

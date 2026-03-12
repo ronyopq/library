@@ -3,7 +3,7 @@ import type { AuthUser } from "@shared/types";
 export interface Env {
   DB: D1Database;
   LIBRARY_KV: KVNamespace;
-  ASSETS: Fetcher;
+  ASSETS?: Fetcher;
   APP_ENV?: string;
   ADMIN_TOKEN?: string;
   OCR_SPACE_API_KEY?: string;
