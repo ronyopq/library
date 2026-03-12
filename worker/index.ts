@@ -54,6 +54,8 @@ app.get("/b/:shortId", async (c) => {
   const dateAdded = new Date(book.dateAdded).toLocaleDateString("en-US");
   const location = escapeHtml([book.room, book.cabinet, book.rack, book.shelf, book.positionNote].filter(Boolean).join(" / "));
   const notes = escapeHtml(book.publicNotes ?? book.summary ?? "");
+  const contactAddress = escapeHtml(settings.contactAddress ?? "");
+  const contactPhone = escapeHtml(settings.contactPhone ?? "");
   const copySummary = `${book.copyCount} copies (${book.availableCopyCount} available, ${book.borrowedCopyCount} borrowed)`;
   const activeLoansHtml = book.activeLoans.length
     ? `<div class="borrowed"><h3>Currently Borrowed</h3><ul>${book.activeLoans
@@ -64,17 +66,6 @@ app.get("/b/:shortId", async (c) => {
             loan.expectedReturnAt ? ` | Due: ${escapeHtml(new Date(loan.expectedReturnAt).toLocaleDateString("en-US"))}` : ""
           }</li>`
         )
-        .join("")}</ul></div>`
-    : "";
-  const borrowHistoryHtml = book.borrowHistory.length
-    ? `<div class="history"><h3>Borrow Log</h3><ul>${book.borrowHistory
-        .slice(0, 20)
-        .map((loan) => {
-          const noteText = loan.note ? ` | ${escapeHtml(loan.note)}` : "";
-          return `<li><strong>${escapeHtml(loan.copyCode ?? "-")}</strong> - ${escapeHtml(loan.borrowerName)} | Borrowed: ${escapeHtml(
-            new Date(loan.borrowedAt).toLocaleDateString("en-US")
-          )}${loan.returnedAt ? ` | Returned: ${escapeHtml(new Date(loan.returnedAt).toLocaleDateString("en-US"))}` : ""}${noteText}</li>`;
-        })
         .join("")}</ul></div>`
     : "";
   const coverUrl = book.coverImageKey
@@ -90,17 +81,13 @@ app.get("/b/:shortId", async (c) => {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${title} | ${escapeHtml(settings.libraryName)}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Bengali:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
   <style>
-    @font-face {
-      font-family: "Akhanda Bangali";
-      src: url("/fonts/Akhand_Bengali/AkhandBengali.otf") format("opentype");
-      font-style: normal;
-      font-weight: 400;
-      font-display: swap;
-    }
     :root {
       color-scheme: light;
-      font-family: "Space Grotesk", "Akhanda Bangali", sans-serif;
+      font-family: "Space Grotesk", "Noto Serif Bengali", serif;
     }
     body {
       margin: 0;
@@ -108,6 +95,7 @@ app.get("/b/:shortId", async (c) => {
       color: #1b2440;
       min-height: 100vh;
       padding: 24px;
+      line-height: 1.65;
     }
     .card {
       max-width: 760px;
@@ -130,7 +118,7 @@ app.get("/b/:shortId", async (c) => {
       margin: 0 0 8px;
     }
     .title {
-      font-size: 28px;
+      font-size: 30px;
       margin: 0;
       line-height: 1.2;
     }
@@ -153,6 +141,13 @@ app.get("/b/:shortId", async (c) => {
       background: #edf1fb;
     }
     .meta { display: grid; gap: 10px; }
+    .meta,
+    .notes,
+    .borrowed,
+    .footer,
+    .subtitle {
+      font-size: 16px;
+    }
     .meta strong { color: #2b407f; }
     .code {
       margin-top: 12px;
@@ -183,25 +178,28 @@ app.get("/b/:shortId", async (c) => {
       margin: 0 0 8px;
       font-size: 16px;
     }
-    .borrowed ul,
-    .history ul {
+    .borrowed ul {
       margin: 0;
       padding: 0 0 0 18px;
       color: #3c4a70;
-      font-size: 14px;
+      font-size: 15px;
       display: grid;
       gap: 6px;
     }
-    .history {
-      margin: 0 24px 16px;
-      padding: 12px 14px;
-      background: #f8f9ff;
-      border: 1px solid #e3e9fb;
-      border-radius: 10px;
+    .footer {
+      margin: 0 24px 24px;
+      padding-top: 16px;
+      border-top: 1px solid #e5ebfa;
+      color: #556487;
+      display: grid;
+      gap: 10px;
     }
-    .history h3 {
-      margin: 0 0 8px;
-      font-size: 16px;
+    .footer a {
+      color: #365fcf;
+      text-decoration: none;
+    }
+    .footer a:hover {
+      text-decoration: underline;
     }
     @media (max-width: 680px) {
       .content {
@@ -235,8 +233,17 @@ app.get("/b/:shortId", async (c) => {
       </div>
     </section>
     ${activeLoansHtml}
-    ${borrowHistoryHtml}
     ${notes ? `<section class="notes">${notes}</section>` : ""}
+    <footer class="footer">
+      ${
+        contactAddress || contactPhone
+          ? `<div>${contactAddress ? `<div><strong>Library Contact Address:</strong> ${contactAddress}</div>` : ""}${
+              contactPhone ? `<div><strong>Phone:</strong> ${contactPhone}</div>` : ""
+            }</div>`
+          : ""
+      }
+      <div>Made with <span aria-hidden="true">&#10084;</span> by <a href="https://fb.co/RonySiddiqi" target="_blank" rel="noreferrer">RONY</a></div>
+    </footer>
   </article>
 </body>
 </html>`;

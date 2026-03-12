@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import type { BookPayloadInput } from "@shared/schemas";
-import type { DuplicateMatch, IsbnLookupResult, LibraryOptions, OcrExtractionResult } from "@shared/types";
+import type { DuplicateMatch, IsbnLookupResult, LibraryOptions, LinkMetadataResult, OcrExtractionResult } from "@shared/types";
 import { apiRequest } from "@/lib/api";
 import { appAlert } from "@/lib/appDialog";
 import { clearDraft, loadDraft, saveDraft } from "@/lib/draftStore";
@@ -186,7 +186,9 @@ export const BookForm = ({ bookId, initialData, options, draftKey, onSaved }: Bo
   const [cropSource, setCropSource] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
+  const [linkLookupLoading, setLinkLookupLoading] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
+  const [metadataLink, setMetadataLink] = useState("");
   const [ocrMessage, setOcrMessage] = useState<string>("");
   const [duplicates, setDuplicates] = useState<DuplicateMatch[]>([]);
   const [pendingPayload, setPendingPayload] = useState<BookPayloadInput | null>(null);
@@ -378,6 +380,10 @@ export const BookForm = ({ bookId, initialData, options, draftKey, onSaved }: Bo
     if (merged.isbn10) form.setValue("isbn10", merged.isbn10);
     if (merged.isbn13) form.setValue("isbn13", merged.isbn13);
     if (merged.metadataSource) form.setValue("metadataSource", merged.metadataSource);
+    if (merged.coverImageKey) {
+      setCoverImageKey(merged.coverImageKey);
+      setCoverPreview(resolveCoverImageUrl(merged.coverImageKey));
+    }
 
     const authorList = (merged.contributors ?? [])
       .filter((entry) => entry.role === "author")
@@ -385,6 +391,28 @@ export const BookForm = ({ bookId, initialData, options, draftKey, onSaved }: Bo
       .join(", ");
     if (authorList) {
       form.setValue("authorNames", authorList);
+    }
+  };
+
+  const handleLinkImport = async () => {
+    if (!metadataLink.trim()) {
+      appAlert("Paste a book page link first.");
+      return;
+    }
+
+    setLinkLookupLoading(true);
+    try {
+      const result = await apiRequest<LinkMetadataResult>("/api/metadata/import-link", {
+        method: "POST",
+        body: JSON.stringify({ url: metadataLink.trim() })
+      });
+      applyMetadata(result.merged);
+      setMetadataSourceDetails(result.merged.metadataSourceDetails as Record<string, unknown> | undefined);
+      setOcrMessage(`Metadata imported from ${result.source}. Please review and save.`);
+    } catch (error) {
+      appAlert((error as Error).message);
+    } finally {
+      setLinkLookupLoading(false);
     }
   };
 
@@ -472,7 +500,7 @@ export const BookForm = ({ bookId, initialData, options, draftKey, onSaved }: Bo
       {duplicates.length > 0 ? <DuplicateWarning duplicates={duplicates} onForceSave={handleForceSave} /> : null}
 
       <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
-        <h2 className={sectionTitleClass}>ISBN Autofill and OCR</h2>
+        <h2 className={sectionTitleClass}>ISBN, Book Link, and OCR</h2>
         <div className="grid gap-3 md:grid-cols-[1fr_auto]">
           <div className="grid grid-cols-2 gap-2">
             <input {...form.register("isbn10")} placeholder="ISBN-10" className={inputClass} />
@@ -488,6 +516,23 @@ export const BookForm = ({ bookId, initialData, options, draftKey, onSaved }: Bo
           </button>
         </div>
 
+        <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
+          <input
+            value={metadataLink}
+            onChange={(event) => setMetadataLink(event.target.value)}
+            placeholder="Paste a Rokomari or other book page link"
+            className={inputClass}
+          />
+          <button
+            type="button"
+            onClick={handleLinkImport}
+            disabled={linkLookupLoading}
+            className="rounded-xl border border-app-border px-4 py-2 text-sm font-medium hover:bg-app-surface disabled:opacity-60"
+          >
+            {linkLookupLoading ? "Importing..." : "Import from Link"}
+          </button>
+        </div>
+
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-app-border px-3 py-2 text-sm">
             OCR Image Upload
@@ -496,6 +541,9 @@ export const BookForm = ({ bookId, initialData, options, draftKey, onSaved }: Bo
           {ocrLoading ? <span className="text-sm text-app-muted">Running OCR...</span> : null}
           {ocrMessage ? <span className="text-sm text-app-muted">{ocrMessage}</span> : null}
         </div>
+        <p className="mt-2 text-xs text-app-muted">
+          Supported now: direct ISBN lookup, OCR, and book page import from sites like Rokomari. Generic book/product pages also work when metadata tags are available.
+        </p>
       </section>
 
       <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">

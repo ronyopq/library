@@ -22,6 +22,9 @@ INSERT OR REPLACE INTO library_settings (
   library_name,
   date_format,
   public_visibility_mode,
+  site_meta_title,
+  site_meta_description,
+  label_header_text,
   label_include_title,
   label_include_author,
   label_include_date,
@@ -30,4 +33,4 @@ INSERT OR REPLACE INTO library_settings (
   label_width_mm,
   label_height_mm
 )
-VALUES (1, 'My Library', 'yyyy-MM-dd', 'selected', 1, 1, 0, 1, 3, 50, 30);
+VALUES (1, 'My Library', 'yyyy-MM-dd', 'selected', 'My Library', 'Personal library catalog and barcode access.', 'My Library', 1, 1, 0, 1, 3, 50, 30);

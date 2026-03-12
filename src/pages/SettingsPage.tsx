@@ -3,19 +3,26 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorState } from "@/components/common/ErrorState";
 import { LoadingState } from "@/components/common/LoadingState";
 import { apiRequest } from "@/lib/api";
-import { appAlert, appConfirm } from "@/lib/appDialog";
 import { getStoredAuthUser, isCurrentUserAdmin } from "@/lib/adminAuth";
+import { appAlert, appConfirm } from "@/lib/appDialog";
+import { resolveCoverImageUrl } from "@/lib/cover";
+import { fileToDataUrl } from "@/lib/crop";
 
 interface SettingsForm {
   libraryName: string;
+  logoImageKey?: string;
   publicBaseUrl: string;
   dateFormat: string;
   contactName: string;
   contactPhone: string;
   contactEmail: string;
+  contactAddress: string;
+  siteMetaTitle: string;
+  siteMetaDescription: string;
   defaultLanguage: string;
   defaultCategory: string;
   publicVisibilityMode: "selected" | "all" | "off";
+  labelHeaderText: string;
   labelIncludeTitle: boolean;
   labelIncludeAuthor: boolean;
   labelIncludeDate: boolean;
@@ -45,11 +52,16 @@ const domainLabels: Record<OptionDomain, string> = {
   publisher: "Publishers",
   tag: "Tags"
 };
+
 const optionDomains: OptionDomain[] = ["category", "language", "publisher", "tag"];
 
 export const SettingsPage = () => {
   const queryClient = useQueryClient();
+  const currentUser = getStoredAuthUser();
+  const canManageCatalog = isCurrentUserAdmin();
+  const canManageUsers = isCurrentUserAdmin();
   const [form, setForm] = useState<SettingsForm | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
   const [newOption, setNewOption] = useState<Record<OptionDomain, string>>({
     category: "",
     language: "",
@@ -57,11 +69,8 @@ export const SettingsPage = () => {
     tag: ""
   });
   const [editing, setEditing] = useState<Record<number, string>>({});
-  const currentUser = getStoredAuthUser();
-  const canManageUsers = isCurrentUserAdmin();
-  const canManageCatalog = isCurrentUserAdmin();
 
-  const query = useQuery({
+  const settingsQuery = useQuery({
     queryKey: ["settings"],
     queryFn: () => apiRequest<{ settings: SettingsForm }>("/api/settings")
   });
@@ -72,28 +81,35 @@ export const SettingsPage = () => {
   });
 
   useEffect(() => {
-    if (query.data?.settings) {
-      setForm(query.data.settings);
+    if (settingsQuery.data?.settings) {
+      setForm(settingsQuery.data.settings);
     }
-  }, [query.data]);
+  }, [settingsQuery.data]);
 
-  const mutation = useMutation({
+  const saveMutation = useMutation({
     mutationFn: (payload: SettingsForm) =>
       apiRequest<{ settings: SettingsForm }>("/api/settings", {
         method: "PUT",
         body: JSON.stringify({
           ...payload,
+          logoImageKey: payload.logoImageKey?.trim() || undefined,
           publicBaseUrl: payload.publicBaseUrl?.trim() || undefined,
           contactName: payload.contactName?.trim() || undefined,
           contactPhone: payload.contactPhone?.trim() || undefined,
           contactEmail: payload.contactEmail?.trim() || undefined,
+          contactAddress: payload.contactAddress?.trim() || undefined,
+          siteMetaTitle: payload.siteMetaTitle?.trim() || undefined,
+          siteMetaDescription: payload.siteMetaDescription?.trim() || undefined,
           defaultLanguage: payload.defaultLanguage?.trim() || undefined,
-          defaultCategory: payload.defaultCategory?.trim() || undefined
+          defaultCategory: payload.defaultCategory?.trim() || undefined,
+          labelHeaderText: payload.labelHeaderText?.trim() || undefined
         })
       }),
     onSuccess: (result) => {
       setForm(result.settings);
       queryClient.invalidateQueries({ queryKey: ["settings"] });
+      queryClient.invalidateQueries({ queryKey: ["public-site-settings"] });
+      appAlert("Settings saved.");
     },
     onError: (error) => {
       appAlert((error as Error).message);
@@ -144,30 +160,103 @@ export const SettingsPage = () => {
     onError: (error) => appAlert((error as Error).message)
   });
 
-  if (query.isLoading || !form || catalogQuery.isLoading) return <LoadingState />;
-  if (query.isError) return <ErrorState message={(query.error as Error).message} retry={() => query.refetch()} />;
-  if (catalogQuery.isError) {
-    return <ErrorState message={(catalogQuery.error as Error).message} retry={() => catalogQuery.refetch()} />;
-  }
-
   const update = <K extends keyof SettingsForm>(key: K, value: SettingsForm[K]) => {
     setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
 
+  const handleLogoUpload = async (file?: File | null) => {
+    if (!file) return;
+
+    setLogoUploading(true);
+    try {
+      const imageDataUrl = await fileToDataUrl(file);
+      const uploaded = await apiRequest<{ key: string; url: string }>("/api/images/cover", {
+        method: "POST",
+        body: JSON.stringify({ imageDataUrl })
+      });
+      update("logoImageKey", uploaded.key);
+    } catch (error) {
+      appAlert((error as Error).message);
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+
+  if (settingsQuery.isLoading || !form || catalogQuery.isLoading) return <LoadingState />;
+  if (settingsQuery.isError) {
+    return <ErrorState message={(settingsQuery.error as Error).message} retry={() => settingsQuery.refetch()} />;
+  }
+  if (catalogQuery.isError) {
+    return <ErrorState message={(catalogQuery.error as Error).message} retry={() => catalogQuery.refetch()} />;
+  }
+
   const catalog = catalogQuery.data;
+  const logoPreviewUrl = resolveCoverImageUrl(form.logoImageKey);
 
   return (
     <div className="space-y-4">
       <header className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
         <h2 className="font-heading text-xl">Library Settings</h2>
-        <p className="text-sm text-app-muted">Branding, public URL, print preferences, and privacy defaults.</p>
+        <p className="text-sm text-app-muted">Branding, mobile install icon, metadata, contact details, and label preferences.</p>
       </header>
 
       <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
-        <h3 className="font-heading text-base">General</h3>
+        <h3 className="font-heading text-base">General Branding</h3>
         <div className="mt-3 grid gap-3 md:grid-cols-2">
-          <input value={form.libraryName} onChange={(event) => update("libraryName", event.target.value)} placeholder="Library Name" className="rounded-xl border border-app-border px-3 py-2 text-sm" />
-          <input value={form.publicBaseUrl ?? ""} onChange={(event) => update("publicBaseUrl", event.target.value)} placeholder="Public Base URL" className="rounded-xl border border-app-border px-3 py-2 text-sm" />
+          <div className="rounded-2xl border border-app-border bg-app-surface/40 p-3 md:col-span-2">
+            <p className="text-sm font-medium text-app-text">Library Logo and App Icon</p>
+            <p className="mt-1 text-xs text-app-muted">
+              This image is used for the library icon, public header branding, browser icon, and mobile install icon.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-4">
+              {logoPreviewUrl ? (
+                <img src={logoPreviewUrl} alt="Library logo" className="h-16 w-16 rounded-2xl border border-app-border object-cover" />
+              ) : (
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-dashed border-app-border bg-white text-xs text-app-muted">
+                  No logo
+                </div>
+              )}
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-app-border bg-white px-3 py-2 text-sm">
+                {logoUploading ? "Uploading..." : "Upload Logo / Icon"}
+                <input type="file" accept="image/*" className="hidden" onChange={(event) => handleLogoUpload(event.target.files?.[0])} />
+              </label>
+              {form.logoImageKey ? (
+                <button
+                  type="button"
+                  onClick={() => update("logoImageKey", "")}
+                  className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-rose-700"
+                >
+                  Remove Logo
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          <input
+            value={form.libraryName}
+            onChange={(event) => update("libraryName", event.target.value)}
+            placeholder="Library Name"
+            className="rounded-xl border border-app-border px-3 py-2 text-sm"
+          />
+          <input
+            value={form.publicBaseUrl ?? ""}
+            onChange={(event) => update("publicBaseUrl", event.target.value)}
+            placeholder="Public Base URL"
+            className="rounded-xl border border-app-border px-3 py-2 text-sm"
+          />
+          <input
+            value={form.siteMetaTitle ?? ""}
+            onChange={(event) => update("siteMetaTitle", event.target.value)}
+            placeholder="Browser / App Title"
+            className="rounded-xl border border-app-border px-3 py-2 text-sm"
+          />
+          <input
+            value={form.labelHeaderText ?? ""}
+            onChange={(event) => update("labelHeaderText", event.target.value)}
+            placeholder="Barcode Print Header Text"
+            className="rounded-xl border border-app-border px-3 py-2 text-sm"
+          />
+
           <label className="text-sm">
             Date Format
             <input
@@ -178,15 +267,40 @@ export const SettingsPage = () => {
             />
             <span className="mt-1 block text-xs text-app-muted">Used across dashboard, borrow history, and public pages.</span>
           </label>
-          <select value={form.publicVisibilityMode} onChange={(event) => update("publicVisibilityMode", event.target.value as SettingsForm["publicVisibilityMode"])} className="rounded-xl border border-app-border px-3 py-2 text-sm">
+
+          <select
+            value={form.publicVisibilityMode}
+            onChange={(event) => update("publicVisibilityMode", event.target.value as SettingsForm["publicVisibilityMode"])}
+            className="rounded-xl border border-app-border px-3 py-2 text-sm"
+          >
             <option value="selected">Selected books only</option>
             <option value="all">All books public by default</option>
             <option value="off">Public pages off by default</option>
           </select>
-          <input value={form.contactName ?? ""} onChange={(event) => update("contactName", event.target.value)} placeholder="Contact Name" className="rounded-xl border border-app-border px-3 py-2 text-sm" />
-          <input value={form.contactPhone ?? ""} onChange={(event) => update("contactPhone", event.target.value)} placeholder="Contact Phone" className="rounded-xl border border-app-border px-3 py-2 text-sm" />
-          <input value={form.contactEmail ?? ""} onChange={(event) => update("contactEmail", event.target.value)} placeholder="Contact Email" className="rounded-xl border border-app-border px-3 py-2 text-sm" />
-          <select value={form.defaultLanguage ?? ""} onChange={(event) => update("defaultLanguage", event.target.value)} className="rounded-xl border border-app-border px-3 py-2 text-sm">
+
+          <input
+            value={form.contactName ?? ""}
+            onChange={(event) => update("contactName", event.target.value)}
+            placeholder="Contact Name"
+            className="rounded-xl border border-app-border px-3 py-2 text-sm"
+          />
+          <input
+            value={form.contactPhone ?? ""}
+            onChange={(event) => update("contactPhone", event.target.value)}
+            placeholder="Contact Phone"
+            className="rounded-xl border border-app-border px-3 py-2 text-sm"
+          />
+          <input
+            value={form.contactEmail ?? ""}
+            onChange={(event) => update("contactEmail", event.target.value)}
+            placeholder="Contact Email"
+            className="rounded-xl border border-app-border px-3 py-2 text-sm"
+          />
+          <select
+            value={form.defaultLanguage ?? ""}
+            onChange={(event) => update("defaultLanguage", event.target.value)}
+            className="rounded-xl border border-app-border px-3 py-2 text-sm"
+          >
             <option value="">Default Language</option>
             {catalog?.language.map((item) => (
               <option key={item.id} value={item.name}>
@@ -194,7 +308,11 @@ export const SettingsPage = () => {
               </option>
             ))}
           </select>
-          <select value={form.defaultCategory ?? ""} onChange={(event) => update("defaultCategory", event.target.value)} className="rounded-xl border border-app-border px-3 py-2 text-sm">
+          <select
+            value={form.defaultCategory ?? ""}
+            onChange={(event) => update("defaultCategory", event.target.value)}
+            className="rounded-xl border border-app-border px-3 py-2 text-sm"
+          >
             <option value="">Default Category</option>
             {catalog?.category.map((item) => (
               <option key={item.id} value={item.name}>
@@ -202,20 +320,44 @@ export const SettingsPage = () => {
               </option>
             ))}
           </select>
+
+          <textarea
+            value={form.contactAddress ?? ""}
+            onChange={(event) => update("contactAddress", event.target.value)}
+            placeholder="Library Contact Address"
+            className="min-h-24 rounded-xl border border-app-border px-3 py-2 text-sm md:col-span-2"
+          />
+          <textarea
+            value={form.siteMetaDescription ?? ""}
+            onChange={(event) => update("siteMetaDescription", event.target.value)}
+            placeholder="Site Meta Description"
+            className="min-h-24 rounded-xl border border-app-border px-3 py-2 text-sm md:col-span-2"
+          />
         </div>
       </section>
 
       <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
         <h3 className="font-heading text-base">Print Labels</h3>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <input
+            value={form.labelHeaderText ?? ""}
+            onChange={(event) => update("labelHeaderText", event.target.value)}
+            placeholder="Printed Header Text"
+            className="rounded-xl border border-app-border px-3 py-2 text-sm md:col-span-2"
+          />
+        </div>
+
         <div className="mt-3 flex flex-wrap gap-3 text-sm">
-          {[
-            ["labelIncludeTitle", "Include Title"],
-            ["labelIncludeAuthor", "Include Author"],
-            ["labelIncludeDate", "Include Date"],
-            ["labelIncludeQr", "Include QR"]
-          ].map(([key, label]) => (
+          {(
+            [
+              ["labelIncludeTitle", "Include Title"],
+              ["labelIncludeAuthor", "Include Author"],
+              ["labelIncludeDate", "Include Date"],
+              ["labelIncludeQr", "Include QR"]
+            ] as const
+          ).map(([key, label]) => (
             <label key={key} className="inline-flex items-center gap-2">
-              <input type="checkbox" checked={Boolean((form as any)[key])} onChange={(event) => update(key as keyof SettingsForm, event.target.checked as never)} />
+              <input type="checkbox" checked={Boolean(form[key])} onChange={(event) => update(key, event.target.checked)} />
               {label}
             </label>
           ))}
@@ -230,9 +372,7 @@ export const SettingsPage = () => {
 
       <section className="rounded-2xl border border-app-border bg-white p-4 shadow-card">
         <h3 className="font-heading text-base">Dropdown Option Manager</h3>
-        <p className="mt-1 text-sm text-app-muted">
-          Admin can maintain dropdown lists for new book entry.
-        </p>
+        <p className="mt-1 text-sm text-app-muted">Admin can maintain dropdown lists for new book entry.</p>
 
         {!canManageCatalog ? (
           <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
@@ -318,8 +458,13 @@ export const SettingsPage = () => {
       </section>
 
       <div className="flex justify-end">
-        <button type="button" onClick={() => mutation.mutate(form)} disabled={mutation.isPending} className="rounded-lg bg-app-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-60">
-          {mutation.isPending ? "Saving..." : "Save Settings"}
+        <button
+          type="button"
+          onClick={() => saveMutation.mutate(form)}
+          disabled={saveMutation.isPending}
+          className="rounded-lg bg-app-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+        >
+          {saveMutation.isPending ? "Saving..." : "Save Settings"}
         </button>
       </div>
     </div>

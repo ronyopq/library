@@ -173,13 +173,17 @@ export const settingsSchema = z.object({
   dateFormat: z.string().trim().min(4).max(40).default("yyyy-MM-dd"),
   contactName: optionalText,
   contactPhone: optionalText,
+  contactAddress: z.string().trim().max(1000).optional(),
   contactEmail: z
     .union([z.string().email(), z.literal("")])
     .optional()
     .transform((value) => (value && value.length > 0 ? value : undefined)),
+  siteMetaTitle: z.string().trim().max(200).optional(),
+  siteMetaDescription: z.string().trim().max(400).optional(),
   publicVisibilityMode: z.enum(["selected", "all", "off"]).default("selected"),
   defaultLanguage: optionalText,
   defaultCategory: optionalText,
+  labelHeaderText: z.string().trim().max(120).optional(),
   labelIncludeTitle: z.boolean().default(true),
   labelIncludeAuthor: z.boolean().default(true),
   labelIncludeDate: z.boolean().default(false),
@@ -187,6 +191,10 @@ export const settingsSchema = z.object({
   labelColumns: z.number().int().min(1).max(5).default(3),
   labelWidthMm: z.number().int().min(20).max(120).default(50),
   labelHeightMm: z.number().int().min(15).max(120).default(30)
+});
+
+export const metadataLinkLookupSchema = z.object({
+  url: z.string().trim().url().max(500)
 });
 
 export const loginSchema = z.object({
@@ -244,6 +252,7 @@ export type PublicBorrowRequestCreateInput = z.infer<typeof publicBorrowRequestC
 export type LoanRequestDecisionInput = z.infer<typeof loanRequestDecisionSchema>;
 export type LoanReturnInput = z.infer<typeof loanReturnSchema>;
 export type SettingsInput = z.infer<typeof settingsSchema>;
+export type MetadataLinkLookupInput = z.infer<typeof metadataLinkLookupSchema>;
 export type AcquisitionInput = z.infer<typeof acquisitionSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateStaffUserInput = z.infer<typeof createStaffUserSchema>;

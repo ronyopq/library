@@ -68,6 +68,7 @@ export const PrintLabelsPage = () => {
   const settings = settingsQuery.data?.settings;
   const effectiveSettings = {
     libraryName: settings?.libraryName ?? "Personal Library",
+    labelHeaderText: settings?.labelHeaderText ?? settings?.libraryName ?? "Personal Library",
     publicBaseUrl: settings?.publicBaseUrl ?? "",
     labelIncludeTitle: settings?.labelIncludeTitle ?? true,
     labelIncludeAuthor: settings?.labelIncludeAuthor ?? true,
@@ -347,7 +348,7 @@ export const PrintLabelsPage = () => {
           >
             <LabelPreview
               item={item}
-              libraryName={effectiveSettings.libraryName}
+              libraryName={effectiveSettings.labelHeaderText}
               publicBaseUrl={effectiveSettings.publicBaseUrl}
               includeTitle={displaySettings.labelIncludeTitle}
               includeAuthor={displaySettings.labelIncludeAuthor}

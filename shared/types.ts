@@ -196,6 +196,26 @@ export interface AppSettings extends SettingsInput {
   updatedAt: string;
 }
 
+export interface PublicSiteSettings {
+  libraryName: string;
+  logoImageKey?: string;
+  publicBaseUrl?: string;
+  contactName?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  contactAddress?: string;
+  siteMetaTitle?: string;
+  siteMetaDescription?: string;
+  labelHeaderText?: string;
+}
+
+export interface LinkMetadataResult {
+  url: string;
+  source: string;
+  strategy: string;
+  merged: Partial<BookPayloadInput>;
+}
+
 export interface ApiError {
   error: string;
   details?: unknown;

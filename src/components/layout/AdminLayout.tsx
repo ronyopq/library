@@ -1,14 +1,23 @@
+import { useQuery } from "@tanstack/react-query";
 import { BookOpenText, Boxes, History, LayoutDashboard, LogOut, MessageSquareText, Printer, ScrollText, Settings, ShieldCheck, UsersRound } from "lucide-react";
 import { useMemo, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { clearAdminSession, getStoredAuthUser, isCurrentUserAdmin } from "@/lib/adminAuth";
 import { apiRequest } from "@/lib/api";
+import { resolveCoverImageUrl } from "@/lib/cover";
 
 export const AdminLayout = () => {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const currentUser = getStoredAuthUser();
   const isAdmin = isCurrentUserAdmin();
+  const settingsQuery = useQuery({
+    queryKey: ["settings", "admin-layout-branding"],
+    queryFn: () => apiRequest<{ settings: { libraryName: string; logoImageKey?: string } }>("/api/settings"),
+    staleTime: 60_000
+  });
+  const libraryName = settingsQuery.data?.settings.libraryName || "Personal Library";
+  const logoUrl = resolveCoverImageUrl(settingsQuery.data?.settings.logoImageKey);
 
   const navItems = useMemo(
     () => [
@@ -36,7 +45,10 @@ export const AdminLayout = () => {
         <aside className={`rounded-3xl border border-app-border bg-white p-4 shadow-card ${open ? "block" : "hidden md:block"}`}>
           <div className="mb-6 px-2">
             <p className="text-xs uppercase tracking-[0.16em] text-app-muted">Admin Panel</p>
-            <h1 className="mt-2 font-heading text-xl text-app-text">Personal Library</h1>
+            <div className="mt-2 flex items-center gap-3">
+              {logoUrl ? <img src={logoUrl} alt={libraryName} className="h-10 w-10 rounded-2xl border border-app-border object-cover" /> : null}
+              <h1 className="font-heading text-xl text-app-text">{libraryName}</h1>
+            </div>
             <p className="mt-2 text-xs text-app-muted">
               Signed in as {currentUser?.username ?? "unknown"} ({currentUser?.role ?? "staff"})
             </p>

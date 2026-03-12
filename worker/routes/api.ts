@@ -10,6 +10,7 @@ import {
   duplicateCheckSchema,
   isbnLookupSchema,
   loanRequestDecisionSchema,
+  metadataLinkLookupSchema,
   optionDomainSchema,
   optionValueSchema,
   resetStaffPasswordSchema,
@@ -54,6 +55,7 @@ import { findDuplicateMatches } from "../services/duplicateService";
 import { exportBooksCsv, exportLoansCsv } from "../services/exportService";
 import { storeCoverImage } from "../services/imageService";
 import { lookupIsbn } from "../services/isbnService";
+import { importMetadataFromUrl } from "../services/linkMetadataService";
 import { createLoan, deleteLoan, listLoans, LoanConflictError, returnLoan } from "../services/loanService";
 import { createPublicLoanRequest, decideLoanRequest, listLoanRequests } from "../services/loanRequestService";
 import { extractMetadataFromImage } from "../services/ocrService";
@@ -64,7 +66,7 @@ import {
   listAdminReviews,
   updateAdminReview
 } from "../services/reviewService";
-import { getSettings, updateSettings } from "../services/settingsService";
+import { getSettings, toPublicSiteSettings, updateSettings } from "../services/settingsService";
 import {
   createCatalogOption,
   deleteCatalogOption,
@@ -99,6 +101,32 @@ const requireAdminRole = async (c: any, next: () => Promise<void>) => {
 const imageUploadSchema = z.object({
   imageDataUrl: z.string().startsWith("data:image/")
 });
+
+const buildFallbackIconSvg = (libraryName: string) => {
+  const initial = (libraryName.trim().charAt(0) || "L").toUpperCase();
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="${libraryName}">
+    <defs>
+      <linearGradient id="g" x1="0%" x2="100%" y1="0%" y2="100%">
+        <stop offset="0%" stop-color="#365fcf" />
+        <stop offset="100%" stop-color="#2144a8" />
+      </linearGradient>
+    </defs>
+    <rect width="256" height="256" rx="48" fill="url(#g)" />
+    <text x="50%" y="55%" text-anchor="middle" font-size="120" font-family="Georgia, serif" fill="white">${initial}</text>
+  </svg>`;
+};
+
+const resolvePublicAssetRedirect = (requestUrl: string, imageKey?: string) => {
+  if (!imageKey) return undefined;
+  if (/^https?:\/\//i.test(imageKey)) return imageKey;
+  return new URL(`/i/${encodeURIComponent(imageKey)}`, requestUrl).toString();
+};
+
+const withQueryParam = (url: string, key: string, value: string) => {
+  const target = new URL(url);
+  target.searchParams.set(key, value);
+  return target.toString();
+};
 
 export const apiRouter = new Hono<AppBindings>();
 
@@ -153,6 +181,58 @@ apiRouter.get("/public/summary", async (c) => {
   const db = getDb(c.env);
   const summary = await getPublicCatalogSummary(db);
   return c.json(summary);
+});
+
+apiRouter.get("/public/settings", async (c) => {
+  const db = getDb(c.env);
+  const settings = await getSettings(db);
+  return c.json({ settings: toPublicSiteSettings(settings) });
+});
+
+apiRouter.get("/public/icon", async (c) => {
+  const db = getDb(c.env);
+  const settings = await getSettings(db);
+  const target = resolvePublicAssetRedirect(c.req.url, settings.logoImageKey);
+
+  if (target) {
+    return c.redirect(target, 302);
+  }
+
+  return new Response(buildFallbackIconSvg(settings.libraryName), {
+    headers: {
+      "content-type": "image/svg+xml; charset=utf-8",
+      "cache-control": "public, max-age=3600"
+    }
+  });
+});
+
+apiRouter.get("/public/manifest.webmanifest", async (c) => {
+  const db = getDb(c.env);
+  const settings = await getSettings(db);
+  const baseUrl = settings.publicBaseUrl?.replace(/\/$/, "") || new URL(c.req.url).origin;
+  const iconUrl = `${baseUrl}/api/public/icon`;
+
+  return new Response(
+    JSON.stringify({
+      name: settings.libraryName,
+      short_name: settings.libraryName.slice(0, 12),
+      description: settings.siteMetaDescription || `${settings.libraryName} mobile catalog`,
+      start_url: "/",
+      display: "standalone",
+      background_color: "#f5f7fb",
+      theme_color: "#365fcf",
+      icons: [
+        { src: withQueryParam(iconUrl, "size", "192"), sizes: "192x192", purpose: "any maskable" },
+        { src: withQueryParam(iconUrl, "size", "512"), sizes: "512x512", purpose: "any maskable" }
+      ]
+    }),
+    {
+      headers: {
+        "content-type": "application/manifest+json; charset=utf-8",
+        "cache-control": "public, max-age=3600"
+      }
+    }
+  );
 });
 
 apiRouter.get("/public/options", async (c) => {
@@ -236,6 +316,7 @@ apiRouter.post("/auth/logout", requireStaff, async (c) => {
 apiRouter.use("/users*", requireStaff);
 apiRouter.use("/books*", requireStaff);
 apiRouter.use("/isbn/*", requireStaff);
+apiRouter.use("/metadata/*", requireStaff);
 apiRouter.use("/ocr/*", requireStaff);
 apiRouter.use("/images/*", requireStaff);
 apiRouter.use("/dashboard", requireStaff);
@@ -453,6 +534,18 @@ apiRouter.post("/isbn/lookup", zValidator("json", isbnLookupSchema), async (c) =
 
   const lookup = await lookupIsbn(c.env, db, payload.isbn);
   return c.json(lookup);
+});
+
+apiRouter.post("/metadata/import-link", zValidator("json", metadataLinkLookupSchema), async (c) => {
+  const payload = c.req.valid("json");
+  const db = getDb(c.env);
+
+  try {
+    const result = await importMetadataFromUrl(c.env, db, payload.url);
+    return c.json(result);
+  } catch (error) {
+    return badRequest(c, error instanceof Error ? error.message : "Could not import metadata from this link.");
+  }
 });
 
 apiRouter.post("/ocr/extract", zValidator("json", ocrExtractSchema), async (c) => {
